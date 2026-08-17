@@ -1,0 +1,38 @@
+# ============================================================================
+# requirements-windows.txt
+# Dependencias para entrenar YOLOv12-Large en Windows 11 (RTX 5060 Ti, 16GB VRAM)
+#
+# Archivo INDEPENDIENTE de requirements.txt (el original del repo NO se modifica).
+# Diferencias frente a requirements.txt original: ver README_EXPERIMENTS.md
+#
+# IMPORTANTE:
+#   - torch / torchvision / torchaudio NO se instalan desde este archivo.
+#     Se instalan por separado con los comandos indicados abajo, para poder
+#     elegir el build de PyTorch con el índice CUDA correcto para tu GPU.
+#   - flash_attn (wheel Linux cp311 en requirements.txt original) se elimina:
+#     no existe wheel oficial para Windows: sdpa/eager attention de PyTorch
+#     se usa automáticamente como fallback en Windows.
+#   - onnxruntime (CPU) se elimina en favor de onnxruntime-gpu únicamente,
+#     para evitar conflictos de paquete duplicado en Windows.
+# ============================================================================
+
+timm==1.0.14
+albumentations==2.0.4
+onnx==1.16.1
+onnxruntime-gpu==1.18.0
+onnxslim==0.1.31
+pycocotools==2.0.7
+PyYAML==6.0.1
+scipy==1.13.0
+opencv-python==4.9.0.80
+psutil==5.9.8
+py-cpuinfo==9.0.0
+huggingface-hub==0.23.2
+safetensors==0.4.3
+numpy==1.26.4
+supervision==0.22.0
+gradio==4.44.1
+
+# --- Añadidos para este flujo de trabajo (no estaban en requirements.txt) ---
+python-dotenv==1.0.1
+wandb==0.17.9

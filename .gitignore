@@ -1,1 +1,17 @@
 *__pycache__/
+
+# --- Credenciales y entorno local ---
+.env
+.env.*
+!.env.example
+
+# --- Pesos de modelo y artefactos de entrenamiento ---
+*.pt
+*.pth
+*.onnx
+*.engine
+runs/
+wandb/
+
+# --- Datasets locales (VisDrone base/augmented, no versionados) ---
+datasets/

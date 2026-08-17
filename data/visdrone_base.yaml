@@ -1,0 +1,20 @@
+# Ultralytics YOLO 🚀 - Dataset config: VisDrone (BASE, sin preprocesamiento adicional)
+# Experimento 1: dataset VisDrone convertido a formato YOLO, clase única "person".
+# Los aumentos on-the-fly (mosaic, mixup, fliplr, hsv, etc.) se aplican en tiempo de
+# entrenamiento vía los hiperparámetros por defecto de ultralytics/cfg/default.yaml,
+# NO se tocan aquí.
+#
+# Resolución de 'path': ultralytics la resuelve como (datasets_dir / path).resolve(),
+# donde datasets_dir es la carpeta 'datasets_dir' de ultralytics/settings.json
+# (por defecto: la carpeta hermana '../datasets' junto al repo clonado).
+# Ver README_EXPERIMENTS.md, sección "Estructura de directorios".
+
+path: ../datasets/VisDrone_Base # raíz del dataset (relativa a datasets_dir)
+train: images/train # imágenes de entrenamiento (relativas a 'path')
+val: images/val # imágenes de validación (relativas a 'path')
+test: # opcional
+
+# Classes
+nc: 1
+names:
+  0: person
