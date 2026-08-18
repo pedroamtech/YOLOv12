@@ -7,8 +7,11 @@
 #
 # IMPORTANTE:
 #   - torch / torchvision / torchaudio NO se instalan desde este archivo.
-#     Se instalan por separado con los comandos indicados abajo, para poder
-#     elegir el build de PyTorch con el índice CUDA correcto para tu GPU.
+#     Instalar ANTES, por separado (ver README_EXPERIMENTS.md §4):
+#       pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu128
+#     CONFIRMADO en RTX 5060 Ti (Blackwell/sm_120): el índice cu124 se probó y
+#     NO funciona (PyTorch reporta sm_120 como no soportado aunque
+#     torch.cuda.is_available() devuelva True); cu128 sí trae kernels sm_120.
 #   - flash_attn (wheel Linux cp311 en requirements.txt original) se elimina:
 #     no existe wheel oficial para Windows: sdpa/eager attention de PyTorch
 #     se usa automáticamente como fallback en Windows.

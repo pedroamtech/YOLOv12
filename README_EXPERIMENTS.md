@@ -15,15 +15,19 @@ paquete `ultralytics/` original.
 | Framework          | PyTorch + CUDA (wheel, ver §2)      |
 | Modelo             | YOLOv12-Large (`yolo12l.pt`)        |
 
-> **Nota sobre CUDA 13.3 y wheels de PyTorch**: los wheels oficiales de PyTorch
-> se distribuyen con etiquetas `cuXXX` (p. ej. `cu124`, `cu128`) que empaquetan
-> su propio runtime CUDA; no necesitan coincidir exactamente con la versión del
-> CUDA Toolkit del sistema, solo requieren un **driver NVIDIA igual o más nuevo**
-> que el mínimo exigido por ese runtime. La RTX 5060 Ti es arquitectura
-> **Blackwell (compute capability `sm_120`)**: si `torch.cuda.is_available()`
-> devuelve `True` pero el entrenamiento falla con `no kernel image is
-> available for execution`, el wheel instalado es demasiado antiguo para
-> Blackwell — reinstala con el canal `cu128` o nightly indicado en §2.
+> **Nota sobre CUDA 13.3 y wheels de PyTorch (confirmado en esta máquina)**: los
+> wheels oficiales de PyTorch se distribuyen con etiquetas `cuXXX` (p. ej.
+> `cu124`, `cu128`) que empaquetan su propio runtime CUDA; no necesitan
+> coincidir exactamente con la versión del CUDA Toolkit del sistema, solo
+> requieren un **driver NVIDIA igual o más nuevo** que el mínimo exigido por
+> ese runtime. La RTX 5060 Ti es arquitectura **Blackwell (compute capability
+> `sm_120`)**. **`cu124` NO sirve**: se probó (`torch==2.6.0+cu124`) y, aunque
+> `torch.cuda.is_available()` devuelve `True` (por eso es engañoso — solo
+> verifica que hay GPU + driver, no que el build tenga kernels para esa
+> arquitectura), PyTorch advierte explícitamente `NVIDIA GeForce RTX 5060 Ti
+> with CUDA capability sm_120 is not compatible with the current PyTorch
+> installation` (soporta hasta `sm_90`, RTX 40). El fix verificado es
+> reinstalar con **`cu128`** (comando exacto en §4).
 
 ## 2. Diferencias: `requirements.txt` (original) vs `requirements-windows.txt` (nuevo)
 
@@ -99,11 +103,11 @@ Ejecutar en PowerShell, con el entorno `yolov12` del §3 ya activado:
 # 1) Actualizar pip
 python -m pip install --upgrade pip
 
-# 2) Instalar PyTorch con soporte CUDA (recomendado para RTX 5060 Ti / Blackwell)
-pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu124
+# 2) Instalar PyTorch con soporte CUDA — cu128, CONFIRMADO para RTX 5060 Ti / Blackwell
+#    (cu124 se probó y NO funciona: PyTorch reporta sm_120 como no soportado)
+pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu128
 
-# 2b) SOLO SI la verificación de GPU falla o aparece "no kernel image is
-#     available" (Blackwell aún no soportado en el build estable cu124):
+# 2b) SOLO SI cu128 estable también falla (variante nightly, no debería hacer falta):
 # pip uninstall -y torch torchvision torchaudio
 # pip install --pre torch torchvision torchaudio --index-url https://download.pytorch.org/whl/nightly/cu128
 
@@ -115,8 +119,9 @@ pip install -e .
 ```
 
 > Evita fijar `torch==2.4.0` en Windows: es una versión con errores conocidos
-> en CPU/Windows (ver `pyproject.toml:73`). Usa la última estable de la serie
-> `2.5.x`/`2.6.x`/`2.7.x`, o el nightly `cu128` indicado arriba si tu GPU lo requiere.
+> en CPU/Windows (ver `pyproject.toml:73`). El comando del paso 2 (índice
+> `cu128`) ya resuelve a una versión reciente (`2.7.x`+) que evita ese problema
+> y sí soporta Blackwell — no hace falta fijar la versión manualmente.
 
 ## 5. Estructura de directorios esperada
 
