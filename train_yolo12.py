@@ -104,7 +104,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--model", default="yolo12l.pt", help="Pesos/config del modelo (default: yolo12l.pt)")
     parser.add_argument("--epochs", type=int, default=250)
     parser.add_argument("--imgsz", type=int, default=1280, help="Imágenes fuente en 720p (1280x720): imgsz=1280 evita reescalar/perder detalle en el lado largo")
-    parser.add_argument("--batch", type=int, default=8, help="16 GB VRAM: 8 es un punto de partida seguro para yolo12l @1280px (Area Attention escala más que una CNN pura); usa -1 para autobatch")
+    parser.add_argument("--batch", type=int, default=4, help="16 GB VRAM: batch=8 @1280px confirmó OOM en TaskAlignedAssigner con este dataset (VisDrone: muchas cajas por imagen); 4 es el valor confirmado. Usa -1 para autobatch")
     parser.add_argument("--workers", type=int, default=8, help="Workers de dataloader; sube/baja según núcleos de CPU disponibles, usa 0 si aparecen BrokenPipeError/EOFError en Windows")
     parser.add_argument("--patience", type=int, default=50)
     args = parser.parse_args()

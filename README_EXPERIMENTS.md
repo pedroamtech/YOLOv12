@@ -233,7 +233,7 @@ python train_yolo12.py `
     --model yolo12l.pt `
     --epochs 250 `
     --imgsz 1280 `
-    --batch 8 `
+    --batch 4 `
     --workers 8
 
 # Experimento 2: dataset aumentado (offline)
@@ -243,7 +243,7 @@ python train_yolo12.py `
     --model yolo12l.pt `
     --epochs 250 `
     --imgsz 1280 `
-    --batch 8 `
+    --batch 4 `
     --workers 8
 ```
 
@@ -258,25 +258,35 @@ de corrida.
 > (padding) en vez de recortarse o deformarse, así que no se pierde detalle.
 > Con YOLOv12-L, los bloques de atención (`A2C2f` / Area Attention) escalan en
 > memoria más que una CNN convencional al subir la resolución, por eso el
-> `--batch` por defecto baja de 16 (a 640px) a 8 (a 1280px) para evitar OOM en
-> 16 GB de VRAM. Si aun así hay `OOM`, baja `--batch` a `4` o usa `--batch -1`
-> (autobatch); si sobra VRAM, puedes subirlo con margen.
+> `--batch` por defecto baja de 16 (a 640px). **Confirmado en este dataset**:
+> `batch=8` a `imgsz=1280` produce `CUDA OutOfMemoryError` en
+> `TaskAlignedAssigner` (VisDrone tiene muchísimas cajas por imagen, lo que
+> infla el tensor de costo de asignación) — el default ahora es `--batch 4`.
+> Si aun así hay `OOM`, baja más o usa `--batch -1` (autobatch, deja que
+> ultralytics mida la VRAM libre real); si sobra VRAM, puedes subirlo con
+> margen — solo usa el **mismo** valor en ambos experimentos.
 
-> **"El entrenamiento es muy lento / no avanza" (diagnóstico, no es un
-> cuelgue)**: a `imgsz=1280` cada iteración procesa 4× los píxeles de 640px, y
-> los bloques de atención de YOLOv12-L escalan peor con resolución que una CNN
-> normal. Además, sin FlashAttention (mensaje `"FlashAttention is not
-> available on this device. Using scaled_dot_product_attention instead."`,
-> normal en Windows) el fallback `scaled_dot_product_attention` es más lento
-> — y en una GPU Blackwell tan reciente como la RTX 5060 Ti, los kernels
-> siguen madurando. Antes de asumir que está colgado, revisa el `s/it` /
-> `ETA` que muestra la barra de progreso: si el ETA es de horas por época, es
-> lento, no un cuelgue. `--workers` por defecto ahora es `8` (antes `2`) —
-> `2` era innecesariamente conservador para evitar `BrokenPipeError` en
-> Windows, pero en una CPU con varios núcleos deja el preprocesamiento
-> (mosaic + albumentations a 1280px) como cuello de botella, con la GPU
-> esperando datos entre picos de uso. Ajusta `--workers` según los núcleos
-> lógicos de tu CPU (el script avisa si lo pasas por encima); si aparece
+> **"El entrenamiento es muy lento / no avanza" (causa raíz confirmada)**: si
+> ves `WARNING: CUDA OutOfMemoryError in TaskAlignedAssigner, using CPU` justo
+> al arrancar la época 1, **esa es la causa** — no un cuelgue. Ultralytics
+> atrapa el `OutOfMemoryError` en ese paso puntual y hace fallback silencioso
+> a CPU (mueve los tensores GPU→CPU, calcula ahí, los regresa a GPU), **en
+> cada iteración**, lo que hace que la GPU se vea casi al límite de uso pero
+> el entrenamiento avance extremadamente lento. Esto fue justo lo que pasó
+> con `batch=8` a `imgsz=1280` en este dataset — de ahí que el default bajara
+> a `--batch 4` (ver nota anterior). Si ya bajaste el batch y sigue lento sin
+> ese warning específico, entran en juego motivos normales de rendimiento: a
+> `imgsz=1280` cada iteración procesa 4× los píxeles de 640px, los bloques de
+> atención de YOLOv12-L escalan peor con resolución que una CNN normal, y sin
+> FlashAttention (mensaje `"FlashAttention is not available on this device.
+> Using scaled_dot_product_attention instead."`, normal en Windows) el
+> fallback `scaled_dot_product_attention` es más lento — en una GPU Blackwell
+> tan reciente como la RTX 5060 Ti, los kernels siguen madurando. Revisa el
+> `s/it` / `ETA` de la barra de progreso: si el ETA es de horas por época, es
+> lento, no un cuelgue. `--workers` por defecto es `8` — en una CPU con varios
+> núcleos, un valor bajo deja el preprocesamiento (mosaic + albumentations a
+> 1280px) como cuello de botella. Ajusta `--workers` según los núcleos lógicos
+> de tu CPU (el script avisa si lo pasas por encima); si aparece
 > `BrokenPipeError` / `EOFError` (multiprocessing en Windows), baja
 > `--workers` a `0`.
 
