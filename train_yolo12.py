@@ -133,6 +133,16 @@ def main() -> None:
     is_augmented = "augment" in Path(args.data).stem.lower()
     wandb_project = f"{creds['project']}-{'Augmented' if is_augmented else 'Base'}"
 
+    # Se inicializa W&B nosotros mismos, ANTES de model.train(). El callback
+    # nativo de ultralytics (on_pretrain_routine_start en wb.py) solo llama a
+    # wb.init(...) si todavía no hay un run activo; si lo dejáramos derivar el
+    # nombre de proyecto él solo, usa el `project=` que le pasamos a
+    # model.train() (una ruta de carpeta local, ver abajo) y solo limpia '/',
+    # no '\' ni ':' — en Windows eso revienta la validación de nombre de
+    # proyecto de W&B. Con el run ya abierto aquí, el callback nativo detecta
+    # wb.run y solo loguea métricas en él, sin volver a inicializar nada.
+    wandb.init(project=wandb_project, name=args.name, entity=creds["entity"])
+
     model = YOLO(args.model)
     model.add_callback("on_fit_epoch_end", make_wandb_metric_logger())
 

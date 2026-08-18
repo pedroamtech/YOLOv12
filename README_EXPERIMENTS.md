@@ -201,10 +201,22 @@ Solo se controlan parámetros de **ejecución/hardware** (no de red): `epochs`,
 > servicio/organización) falla con
 > `ValueError: API key must be 40 characters long, yours was 86` aunque la key
 > sea completamente válida. El script en su lugar exporta
-> `os.environ["WANDB_API_KEY"]` directamente; `wandb.init()` (llamado
-> internamente por el callback nativo de ultralytics al arrancar el
-> entrenamiento) la toma de ahí sin pasar por esa validación de longitud, y
-> autentica contra el backend real de W&B.
+> `os.environ["WANDB_API_KEY"]` directamente, que `wandb.init()` toma sin
+> pasar por esa validación de longitud, y autentica contra el backend real.
+>
+> **Por qué se llama a `wandb.init()` explícitamente en el script (error
+> corregido)**: el callback nativo de ultralytics (`wb.py`) deriva el nombre
+> de proyecto de W&B a partir del `project=` que se le pasa a `model.train()`
+> — que en este script es una ruta local de carpeta
+> (`runs\YOLOv12-Base\...`). Ese callback solo limpia el carácter `/`, no `\`
+> ni `:`, así que en Windows termina pasándole a W&B un nombre de proyecto
+> como `C:\Users\...\runs\YOLOv12-Base`, y W&B lo rechaza:
+> `UsageError: Invalid project name '...': cannot contain characters
+> '/,\,#,?,%,:'`. El fix es inicializar W&B nosotros mismos, antes de
+> `model.train()`, con el nombre de proyecto ya limpio (`${WANDB_PROJECT}-Base`
+> / `${WANDB_PROJECT}-Augmented`, sin caracteres de ruta) — el callback nativo
+> detecta que ya hay un run activo (`wb.run`) y solo loguea métricas en él, sin
+> volver a llamar a `wb.init()`.
 
 ## 8. Ejecutar ambos entrenamientos (PowerShell)
 
