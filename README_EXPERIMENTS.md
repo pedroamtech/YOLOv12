@@ -13,19 +13,19 @@ paquete `ultralytics/` original.
 
 Sigue este orden para reproducir el experimento sin errores:
 
-1. **Preparación del entorno**: crea el entorno conda (§3) e instala las
+1. **Preparación del entorno**: crea el entorno conda (sección 3) e instala las
    dependencias — **no** el `requirements.txt` original del repo, sino
-   `requirements-windows.txt` (§4), que es el archivo independiente pensado
+   `requirements-windows.txt` (sección 4), que es el archivo independiente pensado
    para este flujo en Windows.
 2. **Configuración de parámetros**: apunta `data/visdrone_base.yaml` y
-   `data/visdrone_augmented.yaml` (§5) a tu dataset real, y copia
-   `.env.example` a `.env` (§7) con tu `WANDB_API_KEY`/`WANDB_PROJECT` reales.
-   No toques los hiperparámetros de red (§6) — deben quedar idénticos entre
+   `data/visdrone_augmented.yaml` (sección 5) a tu dataset real, y copia
+   `.env.example` a `.env` (sección 7) con tu `WANDB_API_KEY`/`WANDB_PROJECT` reales.
+   No toques los hiperparámetros de red (sección 6) — deben quedar idénticos entre
    Experimento 1 y 2.
 3. **Ejecución**: corre `train_yolo12.py` con los comandos de PowerShell de
-   la §8, uno por experimento (Base y Augmented).
+   la sección 8, uno por experimento (Base y Augmented).
 4. **Resolución de problemas**: si algo falla o los resultados difieren de
-   lo esperado, revisa la §11 al final de este documento — reúne los
+   lo esperado, revisa la sección 11 al final de este documento — reúne los
    problemas ya encontrados y resueltos durante estas pruebas (build de
    `stringzilla`, autenticación de W&B, OOM en `TaskAlignedAssigner`,
    entrenamiento lento).
@@ -37,7 +37,7 @@ Sigue este orden para reproducir el experimento sin errores:
 | SO                 | Windows 11 Pro                      |
 | GPU                | NVIDIA GeForce RTX 5060 Ti — 16 GB VRAM |
 | CUDA Toolkit       | 13.3 (driver del sistema)           |
-| Framework          | PyTorch + CUDA (wheel, ver §2)      |
+| Framework          | PyTorch + CUDA (wheel, ver sección 2)      |
 | Modelo             | YOLOv12-Medium (`yolo12m.pt`)       |
 
 > **Nota sobre CUDA 13.3 y wheels de PyTorch (confirmado en esta máquina)**: los
@@ -52,7 +52,7 @@ Sigue este orden para reproducir el experimento sin errores:
 > arquitectura), PyTorch advierte explícitamente `NVIDIA GeForce RTX 5060 Ti
 > with CUDA capability sm_120 is not compatible with the current PyTorch
 > installation` (soporta hasta `sm_90`, RTX 40). El fix verificado es
-> reinstalar con **`cu128`** (comando exacto en §4).
+> reinstalar con **`cu128`** (comando exacto en sección 4).
 
 ## 2. Diferencias: `requirements.txt` (original) vs `requirements-windows.txt` (nuevo)
 
@@ -122,7 +122,7 @@ Para eliminarlo por completo (p. ej. para reinstalar desde cero):
 
 ## 4. Instalación manual en Windows (ningún script automático)
 
-Ejecutar en PowerShell, con el entorno `yolov12` del §3 ya activado:
+Ejecutar en PowerShell, con el entorno `yolov12` del sección 3 ya activado:
 
 ```powershell
 # 1) Actualizar pip
@@ -208,7 +208,7 @@ de `ultralytics/cfg/default.yaml`, entre ellos:
 | `close_mosaic` | `10` (últimas 10 épocas sin mosaic) |
 
 Solo se controlan parámetros de **ejecución/hardware** (no de red): `epochs`,
-`imgsz`, `batch`, `workers`, `amp`, `device`, `patience` — ver §8.
+`imgsz`, `batch`, `workers`, `amp`, `device`, `patience` — ver sección 8.
 
 ## 7. Credenciales W&B (seguras, sin hardcodear)
 
@@ -248,7 +248,7 @@ Solo se controlan parámetros de **ejecución/hardware** (no de red): `epochs`,
 
 ## 8. Ejecutar ambos entrenamientos (PowerShell)
 
-Con el entorno `yolov12` (§3) activado:
+Con el entorno `yolov12` (sección 3) activado:
 
 ```powershell
 # Experimento 1: dataset base
@@ -374,10 +374,10 @@ sección indicada.
 
 | Síntoma | Causa | Fix | Detalle |
 |---|---|---|---|
-| `pip install -r requirements-windows.txt` falla con `Building wheel for stringzilla ... Microsoft Visual C++ 14.0 or greater is required` | `albumentations` arrastra `albucore`→`stringzilla>=3.10.4`, que no publica wheel para Windows desde su serie 2.x | Instalar *Build Tools for Visual Studio* y marcar explícitamente el workload **"Desktop development with C++"** (el instalador base solo, sin ese workload, no basta) | §2 |
-| `ValueError: API key must be 40 characters long, yours was 86` al iniciar el entrenamiento | `wandb.login(key=...)` valida el formato clásico de key personal (40 caracteres); las keys con prefijo (`wandb_v1_...`, de cuentas de servicio/organización) no lo cumplen aunque sean válidas | El script ya no llama a `wandb.login()`; exporta `WANDB_API_KEY` como variable de entorno y deja que `wandb.init()` autentique contra el backend real | §7 |
-| `wandb.errors.UsageError: Invalid project name '...': cannot contain characters '/,\,#,?,%,:'` | El callback nativo de ultralytics derivaba el nombre de proyecto de W&B a partir de una ruta local de Windows (con `\` y `:`) | El script llama a `wandb.init(project=..., name=...)` con el nombre de proyecto limpio antes de `model.train()` | §7 |
-| GPU casi al 100% de uso pero el entrenamiento no avanza (época 1 pegada) | `WARNING: CUDA OutOfMemoryError in TaskAlignedAssigner, using CPU` — `batch`/`imgsz` demasiado altos para la VRAM disponible con este dataset (VisDrone tiene muchísimas cajas por imagen) | Bajar `--batch` y/o `--imgsz`, o usar `--batch -1` (autobatch); también se cambió el modelo de `yolo12l.pt` a `yolo12m.pt` | §1 (nota de imgsz/batch), historial de commits |
-| Entrenamiento lento pero **sin** ese warning de OOM | Normal a mayor resolución con YOLOv12: los bloques de atención (`A2C2f`) escalan peor que una CNN, y sin FlashAttention (`"Using scaled_dot_product_attention instead"`, esperado en Windows) el fallback es más lento — más notorio en una GPU Blackwell reciente con kernels aún inmaduros | Revisar el `s/it`/`ETA` de la barra de progreso antes de asumir un cuelgue; considerar bajar `imgsz` o subir `--workers` si el cuello de botella es el preprocesamiento en CPU | §1 |
-| `torch.cuda.is_available()` da `True` pero el entrenamiento falla o cae a CPU sin avisar | El wheel de PyTorch instalado (`cu124`) no incluye kernels para Blackwell (`sm_120`, RTX 50-series) | Reinstalar con `--index-url https://download.pytorch.org/whl/cu128` | §1, §4 |
+| `pip install -r requirements-windows.txt` falla con `Building wheel for stringzilla ... Microsoft Visual C++ 14.0 or greater is required` | `albumentations` arrastra `albucore`→`stringzilla>=3.10.4`, que no publica wheel para Windows desde su serie 2.x | Instalar *Build Tools for Visual Studio* y marcar explícitamente el workload **"Desktop development with C++"** (el instalador base solo, sin ese workload, no basta) | sección 2 |
+| `ValueError: API key must be 40 characters long, yours was 86` al iniciar el entrenamiento | `wandb.login(key=...)` valida el formato clásico de key personal (40 caracteres); las keys con prefijo (`wandb_v1_...`, de cuentas de servicio/organización) no lo cumplen aunque sean válidas | El script ya no llama a `wandb.login()`; exporta `WANDB_API_KEY` como variable de entorno y deja que `wandb.init()` autentique contra el backend real | sección 7 |
+| `wandb.errors.UsageError: Invalid project name '...': cannot contain characters '/,\,#,?,%,:'` | El callback nativo de ultralytics derivaba el nombre de proyecto de W&B a partir de una ruta local de Windows (con `\` y `:`) | El script llama a `wandb.init(project=..., name=...)` con el nombre de proyecto limpio antes de `model.train()` | sección 7 |
+| GPU casi al 100% de uso pero el entrenamiento no avanza (época 1 pegada) | `WARNING: CUDA OutOfMemoryError in TaskAlignedAssigner, using CPU` — `batch`/`imgsz` demasiado altos para la VRAM disponible con este dataset (VisDrone tiene muchísimas cajas por imagen) | Bajar `--batch` y/o `--imgsz`, o usar `--batch -1` (autobatch); también se cambió el modelo de `yolo12l.pt` a `yolo12m.pt` | sección 8 (nota de imgsz/batch), historial de commits |
+| Entrenamiento lento pero **sin** ese warning de OOM | Normal a mayor resolución con YOLOv12: los bloques de atención (`A2C2f`) escalan peor que una CNN, y sin FlashAttention (`"Using scaled_dot_product_attention instead"`, esperado en Windows) el fallback es más lento — más notorio en una GPU Blackwell reciente con kernels aún inmaduros | Revisar el `s/it`/`ETA` de la barra de progreso antes de asumir un cuelgue; considerar bajar `imgsz` o subir `--workers` si el cuello de botella es el preprocesamiento en CPU | sección 8 |
+| `torch.cuda.is_available()` da `True` pero el entrenamiento falla o cae a CPU sin avisar | El wheel de PyTorch instalado (`cu124`) no incluye kernels para Blackwell (`sm_120`, RTX 50-series) | Reinstalar con `--index-url https://download.pytorch.org/whl/cu128` | sección 1, sección 4 |
 
