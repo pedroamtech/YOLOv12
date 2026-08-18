@@ -232,8 +232,8 @@ python train_yolo12.py `
     --name visdrone_base `
     --model yolo12l.pt `
     --epochs 250 `
-    --imgsz 960 `
-    --batch 4 `
+    --imgsz 640 `
+    --batch 16 `
     --workers 8
 
 # Experimento 2: dataset aumentado (offline)
@@ -242,8 +242,8 @@ python train_yolo12.py `
     --name visdrone_augmented `
     --model yolo12l.pt `
     --epochs 250 `
-    --imgsz 960 `
-    --batch 4 `
+    --imgsz 640 `
+    --batch 16 `
     --workers 8
 ```
 
@@ -252,23 +252,25 @@ Resultados locales en subcarpetas independientes dentro del mismo proyecto:
 ambas corridas caen en el mismo proyecto (`YOLOv12`), distinguidas por nombre
 de corrida.
 
-> **Resolución de imagen (720p, reducida a 960)**: las imágenes fuente son
-> 1280×720. `imgsz=960` es un punto medio elegido entre el estándar YOLO
-> (640, el default de `ultralytics/cfg/default.yaml`) y el tamaño nativo
-> (1280): conserva más detalle que 640 para las personas pequeñas/lejanas
-> típicas de VisDrone, pero es notablemente más liviano que 1280 en memoria y
-> velocidad. En modo `train`, ultralytics recibe `imgsz` como un único entero
-> que define el lado largo del letterbox cuadrado; el lado corto se rellena
-> (padding) en vez de recortarse o deformarse. Con YOLOv12-L, los bloques de
-> atención (`A2C2f` / Area Attention) escalan en memoria más que una CNN
-> convencional al subir la resolución. **Confirmado en este dataset a
-> `imgsz=1280`**: `batch=8` produce `CUDA OutOfMemoryError` en
-> `TaskAlignedAssigner` (VisDrone tiene muchísimas cajas por imagen, lo que
-> infla el tensor de costo de asignación) — `--batch 4` quedó como default
-> conservador. A `imgsz=960` puede que quepa un batch más alto (hay ~44% menos
-> píxeles que a 1280px), pero no está verificado todavía — pruébalo con
-> cuidado o usa `--batch -1` (autobatch, deja que ultralytics mida la VRAM
-> libre real) — solo usa el **mismo** valor en ambos experimentos.
+> **Resolución de imagen (bajada al estándar YOLO, 640)**: las imágenes fuente
+> son 1280×720; `imgsz=640` es el default de `ultralytics/cfg/default.yaml` y
+> el tamaño con el que estos modelos fueron ajustados originalmente (COCO). Se
+> probó primero a `1280` (nativo) y luego `960` (punto medio) buscando
+> conservar más detalle para las personas pequeñas/lejanas de VisDrone, pero
+> ambos tamaños son bastante más pesados en memoria y velocidad con
+> YOLOv12-L (los bloques de atención `A2C2f` / Area Attention escalan peor
+> con resolución que una CNN convencional) — `640` prioriza velocidad y
+> estabilidad de entrenamiento sobre ese detalle extra. En modo `train`,
+> ultralytics recibe `imgsz` como un único entero que define el lado largo
+> del letterbox cuadrado; el lado corto se rellena (padding) en vez de
+> recortarse o deformarse. **Confirmado en este dataset a `imgsz=1280`**:
+> `batch=8` produce `CUDA OutOfMemoryError` en `TaskAlignedAssigner`
+> (VisDrone tiene muchísimas cajas por imagen, lo que infla el tensor de
+> costo de asignación). A `640px` hay mucho más margen de VRAM (~6.25× menos
+> píxeles que a 1280px), así que `--batch` sube a `16` — no verificado todavía
+> en este dataset a esta resolución; si da `OOM`, baja o usa `--batch -1`
+> (autobatch, deja que ultralytics mida la VRAM libre real) — solo usa el
+> **mismo** valor en ambos experimentos.
 
 > **"El entrenamiento es muy lento / no avanza" (causa raíz confirmada)**: si
 > ves `WARNING: CUDA OutOfMemoryError in TaskAlignedAssigner, using CPU` justo
@@ -277,12 +279,11 @@ de corrida.
 > a CPU (mueve los tensores GPU→CPU, calcula ahí, los regresa a GPU), **en
 > cada iteración**, lo que hace que la GPU se vea casi al límite de uso pero
 > el entrenamiento avance extremadamente lento. Esto fue justo lo que pasó
-> con `batch=8` a `imgsz=1280` en este dataset — de ahí que el default bajara
-> a `--batch 4` y el `imgsz` por defecto a `960` (ver nota anterior). Si ya
-> bajaste el batch y sigue lento sin ese warning específico, entran en juego
-> motivos normales de rendimiento: incluso a `960px` cada iteración procesa
-> más del doble de píxeles que a 640px, los bloques de atención de YOLOv12-L
-> escalan peor con resolución que una CNN normal, y sin
+> con `batch=8` a `imgsz=1280` en este dataset — de ahí que se bajara primero
+> el `imgsz` (960, luego 640) y el `batch` se reajustara en cada paso (ver
+> nota anterior). Si ya bajaste el batch y sigue lento sin ese warning
+> específico, entran en juego motivos normales de rendimiento: los bloques de
+> atención de YOLOv12-L escalan peor con resolución que una CNN normal, y sin
 > FlashAttention (mensaje `"FlashAttention is not available on this device.
 > Using scaled_dot_product_attention instead."`, normal en Windows) el
 > fallback `scaled_dot_product_attention` es más lento — en una GPU Blackwell
