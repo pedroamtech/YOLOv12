@@ -49,12 +49,19 @@ paquete `ultralytics/` original.
 > cualquier versión de modelo de ultralytics** (YOLOv12, YOLOv11 `yolo11l.pt`,
 > etc.) que use `albumentations` en Windows — no es específico de `yolo12l.pt`.
 >
-> **Fix**: instalar *Build Tools for Visual Studio*
-> (https://visualstudio.microsoft.com/visual-cpp-build-tools/), seleccionando
-> el workload **"Desktop development with C++"** (incluye MSVC v143 + Windows
-> SDK). `stringzilla` es código SIMD portable en C/C++; una vez presente el
-> compilador, compila sin problemas y `pip install -r requirements-windows.txt`
-> continúa normalmente.
+> **Fix (verificado)**: instalar *Build Tools for Visual Studio*
+> (https://visualstudio.microsoft.com/visual-cpp-build-tools/) **no es
+> suficiente por sí solo** — el instalador base no incluye el compilador de
+> C++. Hay que abrir **"Visual Studio Installer"**, elegir **Modificar** sobre
+> "Visual Studio Build Tools", y en la pestaña *Workloads* marcar
+> explícitamente **"Desktop development with C++"** (que trae MSVC v143 +
+> Windows SDK). Sin ese workload marcado, `cl.exe` no existe en el sistema y
+> el error persiste aunque el instalador ya se haya "completado". Tras
+> instalar el workload, cerrar todas las ventanas de PowerShell abiertas (para
+> refrescar el entorno), abrir una nueva, reactivar el entorno conda
+> (`conda activate yolov12`) y reintentar `pip install -r
+> requirements-windows.txt` — `stringzilla` es código SIMD portable en C/C++ y
+> compila sin problemas una vez presente el compilador.
 
 ## 3. Creación del entorno virtual (Anaconda)
 
