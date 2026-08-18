@@ -142,8 +142,9 @@ GitHub/
 │   │   ├── visdrone_base.yaml
 │   │   └── visdrone_augmented.yaml
 │   └── runs/                         ← resultados (gitignored)
-│       ├── YOLOv12-VisDrone-Base/visdrone_base/
-│       └── YOLOv12-VisDrone-Augmented/visdrone_augmented/
+│       └── YOLOv12/                  ← un solo proyecto W&B; Base/Augmented se distinguen por --name
+│           ├── visdrone_base/
+│           └── visdrone_augmented/
 └── datasets/                         ← gitignored, poblado por ti
     ├── VisDrone_Base/
     │   ├── images/{train,val}/*.jpg
@@ -191,8 +192,10 @@ Solo se controlan parámetros de **ejecución/hardware** (no de red): `epochs`,
 - `.env` (NO versionado, ver `.gitignore`) contiene tu `WANDB_API_KEY` real.
 - `train_yolo12.py` carga `.env` con `python-dotenv`; si `WANDB_API_KEY` falta,
   el script aborta con un mensaje claro en vez de entrenar sin tracking.
-- Cada experimento reporta a un **proyecto W&B independiente**:
-  `${WANDB_PROJECT}-Base` y `${WANDB_PROJECT}-Augmented`.
+- Ambos experimentos reportan al **mismo proyecto W&B** (`${WANDB_PROJECT}`,
+  p. ej. `YOLOv12`); Base vs. Augmented se distingue por el **nombre de la
+  corrida** (`--name visdrone_base` / `--name visdrone_augmented`), no por el
+  proyecto.
 
 > **Por qué no se usa `wandb.login(key=...)` (error corregido)**: esa función
 > escribe la key en `~/.netrc` y valida que tenga exactamente 40 caracteres —
@@ -208,14 +211,14 @@ Solo se controlan parámetros de **ejecución/hardware** (no de red): `epochs`,
 > corregido)**: el callback nativo de ultralytics (`wb.py`) deriva el nombre
 > de proyecto de W&B a partir del `project=` que se le pasa a `model.train()`
 > — que en este script es una ruta local de carpeta
-> (`runs\YOLOv12-Base\...`). Ese callback solo limpia el carácter `/`, no `\`
-> ni `:`, así que en Windows termina pasándole a W&B un nombre de proyecto
-> como `C:\Users\...\runs\YOLOv12-Base`, y W&B lo rechaza:
+> (`runs\YOLOv12\...`). Ese callback solo limpia el carácter `/`, no `\` ni
+> `:`, así que en Windows termina pasándole a W&B un nombre de proyecto como
+> `C:\Users\...\runs\YOLOv12`, y W&B lo rechaza:
 > `UsageError: Invalid project name '...': cannot contain characters
 > '/,\,#,?,%,:'`. El fix es inicializar W&B nosotros mismos, antes de
-> `model.train()`, con el nombre de proyecto ya limpio (`${WANDB_PROJECT}-Base`
-> / `${WANDB_PROJECT}-Augmented`, sin caracteres de ruta) — el callback nativo
-> detecta que ya hay un run activo (`wb.run`) y solo loguea métricas en él, sin
+> `model.train()`, con `project=${WANDB_PROJECT}` (el proyecto único y limpio,
+> sin caracteres de ruta) y `name=` la corrida — el callback nativo detecta
+> que ya hay un run activo (`wb.run`) y solo loguea métricas en él, sin
 > volver a llamar a `wb.init()`.
 
 ## 8. Ejecutar ambos entrenamientos (PowerShell)
@@ -244,9 +247,10 @@ python train_yolo12.py `
     --workers 2
 ```
 
-Resultados guardados en carpetas independientes:
-`runs/YOLOv12-VisDrone-Base/visdrone_base/` y
-`runs/YOLOv12-VisDrone-Augmented/visdrone_augmented/`.
+Resultados locales en subcarpetas independientes dentro del mismo proyecto:
+`runs/YOLOv12/visdrone_base/` y `runs/YOLOv12/visdrone_augmented/`. En W&B,
+ambas corridas caen en el mismo proyecto (`YOLOv12`), distinguidas por nombre
+de corrida.
 
 > **Resolución de imagen (720p)**: las imágenes fuente son 1280×720. En modo
 > `train`, ultralytics recibe `imgsz` como un único entero que define el lado

@@ -130,9 +130,11 @@ def main() -> None:
     settings.update({"wandb": True})  # habilita la integración nativa de ultralytics con W&B
 
     args = parse_args()
-    is_augmented = "augment" in Path(args.data).stem.lower()
-    wandb_project = f"{creds['project']}-{'Augmented' if is_augmented else 'Base'}"
 
+    # Un único proyecto de W&B (${WANDB_PROJECT}, ya existente en el
+    # dashboard); Base vs. Augmented se distingue por el NOMBRE de la corrida
+    # (--name), no por el proyecto.
+    #
     # Se inicializa W&B nosotros mismos, ANTES de model.train(). El callback
     # nativo de ultralytics (on_pretrain_routine_start en wb.py) solo llama a
     # wb.init(...) si todavía no hay un run activo; si lo dejáramos derivar el
@@ -141,7 +143,7 @@ def main() -> None:
     # no '\' ni ':' — en Windows eso revienta la validación de nombre de
     # proyecto de W&B. Con el run ya abierto aquí, el callback nativo detecta
     # wb.run y solo loguea métricas en él, sin volver a inicializar nada.
-    wandb.init(project=wandb_project, name=args.name, entity=creds["entity"])
+    wandb.init(project=creds["project"], name=args.name, entity=creds["entity"])
 
     model = YOLO(args.model)
     model.add_callback("on_fit_epoch_end", make_wandb_metric_logger())
@@ -158,7 +160,7 @@ def main() -> None:
         device=0,
         amp=True,
         patience=args.patience,
-        project=str(REPO_ROOT / "runs" / wandb_project),
+        project=str(REPO_ROOT / "runs" / creds["project"]),
         name=args.name,
         exist_ok=True,
         seed=0,
@@ -166,7 +168,7 @@ def main() -> None:
         verbose=True,
     )
 
-    print(f"Entrenamiento finalizado. Resultados en: runs/{wandb_project}/{args.name}")
+    print(f"Entrenamiento finalizado. Resultados en: runs/{creds['project']}/{args.name}")
 
 
 if __name__ == "__main__":
