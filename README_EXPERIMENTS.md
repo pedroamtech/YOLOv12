@@ -1,4 +1,4 @@
-﻿# YOLOv12-Medium sobre VisDrone (Windows) — Documentación de experimentos
+# YOLOv12-Medium sobre VisDrone (Windows) — Documentación de experimentos
 
 Documentación independiente del flujo de entrenamiento local en Windows para
 `yolo12m.pt` sobre un dataset VisDrone de clase única (`person`), con tracking
