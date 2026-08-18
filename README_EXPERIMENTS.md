@@ -234,7 +234,7 @@ python train_yolo12.py `
     --epochs 250 `
     --imgsz 1280 `
     --batch 8 `
-    --workers 2
+    --workers 8
 
 # Experimento 2: dataset aumentado (offline)
 python train_yolo12.py `
@@ -244,7 +244,7 @@ python train_yolo12.py `
     --epochs 250 `
     --imgsz 1280 `
     --batch 8 `
-    --workers 2
+    --workers 8
 ```
 
 Resultados locales en subcarpetas independientes dentro del mismo proyecto:
@@ -262,8 +262,23 @@ de corrida.
 > 16 GB de VRAM. Si aun así hay `OOM`, baja `--batch` a `4` o usa `--batch -1`
 > (autobatch); si sobra VRAM, puedes subirlo con margen.
 
-Si aparece `BrokenPipeError` / `EOFError` (multiprocessing en Windows), reduce
-`--workers` a `0`.
+> **"El entrenamiento es muy lento / no avanza" (diagnóstico, no es un
+> cuelgue)**: a `imgsz=1280` cada iteración procesa 4× los píxeles de 640px, y
+> los bloques de atención de YOLOv12-L escalan peor con resolución que una CNN
+> normal. Además, sin FlashAttention (mensaje `"FlashAttention is not
+> available on this device. Using scaled_dot_product_attention instead."`,
+> normal en Windows) el fallback `scaled_dot_product_attention` es más lento
+> — y en una GPU Blackwell tan reciente como la RTX 5060 Ti, los kernels
+> siguen madurando. Antes de asumir que está colgado, revisa el `s/it` /
+> `ETA` que muestra la barra de progreso: si el ETA es de horas por época, es
+> lento, no un cuelgue. `--workers` por defecto ahora es `8` (antes `2`) —
+> `2` era innecesariamente conservador para evitar `BrokenPipeError` en
+> Windows, pero en una CPU con varios núcleos deja el preprocesamiento
+> (mosaic + albumentations a 1280px) como cuello de botella, con la GPU
+> esperando datos entre picos de uso. Ajusta `--workers` según los núcleos
+> lógicos de tu CPU (el script avisa si lo pasas por encima); si aparece
+> `BrokenPipeError` / `EOFError` (multiprocessing en Windows), baja
+> `--workers` a `0`.
 
 ## 9. Métricas registradas en W&B
 
