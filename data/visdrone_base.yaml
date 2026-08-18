@@ -4,14 +4,12 @@
 # entrenamiento vía los hiperparámetros por defecto de ultralytics/cfg/default.yaml,
 # NO se tocan aquí.
 #
-# Resolución de 'path': ultralytics la resuelve como (datasets_dir / path).resolve(),
-# donde datasets_dir es la carpeta 'datasets_dir' de ultralytics/settings.json
-# (por defecto: la carpeta hermana '../datasets' junto al repo clonado).
-# Ver README_EXPERIMENTS.md, sección "Estructura de directorios".
+# 'path' es absoluta, así que ultralytics la usa tal cual (no se resuelve contra
+# datasets_dir). Ver README_EXPERIMENTS.md, sección "Estructura de directorios".
 
-path: ../datasets/VisDrone_Base # raíz del dataset (relativa a datasets_dir)
-train: images/train # imágenes de entrenamiento (relativas a 'path')
-val: images/val # imágenes de validación (relativas a 'path')
+path: C:/Users/pedroam/Documents/Data-Augmentation/Datasets-Clean/VisDrone # raíz del dataset
+train: train/images # imágenes de entrenamiento (relativas a 'path')
+val: validation/images # imágenes de validación (relativas a 'path')
 test: # opcional
 
 # Classes

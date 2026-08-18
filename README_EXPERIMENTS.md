@@ -120,10 +120,26 @@ pip install -e .
 
 ## 5. Estructura de directorios esperada
 
-Ultralytics resuelve el campo `path` de cada `.yaml` de dataset como
-`(datasets_dir / path).resolve()`, donde `datasets_dir` es la carpeta
-configurada en `ultralytics/settings.json` (por defecto, la carpeta hermana
-`datasets/` junto al repo clonado). Estructura esperada:
+`data/visdrone_base.yaml` usa una ruta **absoluta** en `path:`, así que
+ultralytics la usa tal cual (no pasa por `datasets_dir`). El dataset base real
+vive fuera del repo, en:
+
+```
+C:\Users\pedroam\Documents\Data-Augmentation\Datasets-Clean\VisDrone\
+├── train\
+│   ├── images\        (8081 imágenes)
+│   ├── labels\         (8081 .txt, YOLO: class x_center y_center w h, normalizado 0-1)
+│   └── ignore_masks\   (no usado por ultralytics)
+└── validation\
+    ├── images\        (532 imágenes)
+    ├── labels\         (532 .txt)
+    └── ignore_masks\
+```
+
+`data/visdrone_augmented.yaml` (Experimento 2) todavía usa una ruta relativa
+placeholder (`../datasets/VisDrone_Augmented`, resuelta contra `datasets_dir`
+de `ultralytics/settings.json`) — actualízala del mismo modo cuando tengas
+lista la copia con el pipeline de aumento offline aplicado:
 
 ```
 GitHub/
@@ -134,29 +150,27 @@ GitHub/
 │   ├── README_EXPERIMENTS.md         (este archivo)
 │   ├── .env / .env.example
 │   ├── data/
-│   │   ├── visdrone_base.yaml
-│   │   └── visdrone_augmented.yaml
+│   │   ├── visdrone_base.yaml        (path absoluto, ver arriba)
+│   │   └── visdrone_augmented.yaml   (pendiente de ruta real)
 │   └── runs/                         ← resultados (gitignored)
 │       ├── YOLOv12-VisDrone-Base/visdrone_base/
 │       └── YOLOv12-VisDrone-Augmented/visdrone_augmented/
-└── datasets/                         ← gitignored, poblado por ti
-    ├── VisDrone_Base/
-    │   ├── images/{train,val}/*.jpg
-    │   └── labels/{train,val}/*.txt  (YOLO: class x_center y_center w h, normalizado 0-1)
+└── datasets/                         ← gitignored; solo necesario para el augmented
     └── VisDrone_Augmented/
         ├── images/{train,val}/*.jpg  ← salida de tu pipeline de aumento offline
         └── labels/{train,val}/*.txt
 ```
 
 - **Clases**: `nc: 1`, `names: ['person']` (índice `0`) en ambos `.yaml`.
-- **Experimento 1** (`visdrone_base.yaml`) usa `datasets/VisDrone_Base` (dataset
-  convertido a formato YOLO, sin preprocesamiento adicional).
-- **Experimento 2** (`visdrone_augmented.yaml`) usa `datasets/VisDrone_Augmented`
-  (mismas imágenes de origen, pasadas por tu pipeline de aumento de datos
-  *offline*, previo al entrenamiento). Los aumentos *on-the-fly* de YOLO
-  (mosaic, mixup, fliplr, hsv, etc.) se aplican igual en ambos casos vía los
-  valores por defecto de `ultralytics/cfg/default.yaml` — la única variable
-  entre los dos experimentos es el contenido físico de imágenes/etiquetas.
+  Verificado en el dataset real: las etiquetas solo usan el índice `0`.
+- **Experimento 1** (`visdrone_base.yaml`) apunta al dataset base de arriba,
+  sin preprocesamiento adicional.
+- **Experimento 2** (`visdrone_augmented.yaml`) debe apuntar a una copia de
+  las mismas imágenes, pasadas por tu pipeline de aumento de datos *offline*,
+  previo al entrenamiento. Los aumentos *on-the-fly* de YOLO (mosaic, mixup,
+  fliplr, hsv, etc.) se aplican igual en ambos casos vía los valores por
+  defecto de `ultralytics/cfg/default.yaml` — la única variable entre los dos
+  experimentos es el contenido físico de imágenes/etiquetas.
 
 ## 6. Hiperparámetros (idénticos en ambos experimentos)
 
