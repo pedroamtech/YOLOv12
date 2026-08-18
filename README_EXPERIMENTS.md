@@ -37,6 +37,25 @@ paquete `ultralytics/` original.
 | `wandb` | No estaba | **Añadido** | Tracking de métricas |
 | Resto (`timm`, `albumentations`, `pycocotools`, `opencv-python`, etc.) | igual | igual | Sin cambios, multiplataforma |
 
+> **Problema conocido en Windows: build de `stringzilla` falla (`Microsoft Visual
+> C++ 14.0 or greater is required`)**. `albumentations==2.0.4` depende de
+> `albucore==0.0.23`, que a su vez exige `stringzilla>=3.10.4`. Desde su serie
+> 2.x, `stringzilla` **dejó de publicar wheels precompilados para Windows** en
+> PyPI (los últimos `win_amd64` disponibles son de la serie 1.2.x, por debajo
+> del mínimo que pide `albucore`), así que `pip` intenta compilarlo desde el
+> código fuente y falla si no tienes el compilador de Microsoft C++ instalado.
+> No es un problema de este repo ni de `requirements-windows.txt`: es una
+> limitación actual del paquete `stringzilla` en Windows, y **afecta a
+> cualquier versión de modelo de ultralytics** (YOLOv12, YOLOv11 `yolo11l.pt`,
+> etc.) que use `albumentations` en Windows — no es específico de `yolo12l.pt`.
+>
+> **Fix**: instalar *Build Tools for Visual Studio*
+> (https://visualstudio.microsoft.com/visual-cpp-build-tools/), seleccionando
+> el workload **"Desktop development with C++"** (incluye MSVC v143 + Windows
+> SDK). `stringzilla` es código SIMD portable en C/C++; una vez presente el
+> compilador, compila sin problemas y `pip install -r requirements-windows.txt`
+> continúa normalmente.
+
 ## 3. Creación del entorno virtual (Anaconda)
 
 Todo el trabajo de este flujo (instalación de dependencias, entrenamiento,
