@@ -37,9 +37,37 @@ paquete `ultralytics/` original.
 | `wandb` | No estaba | **Añadido** | Tracking de métricas |
 | Resto (`timm`, `albumentations`, `pycocotools`, `opencv-python`, etc.) | igual | igual | Sin cambios, multiplataforma |
 
-## 3. Instalación manual en Windows (ningún script automático)
+## 3. Creación del entorno virtual (Anaconda)
 
-Ejecutar en PowerShell, dentro de un entorno virtual (`venv` o `conda`) ya activado:
+Todo el trabajo de este flujo (instalación de dependencias, entrenamiento,
+tracking) se hace dentro de un entorno conda dedicado, para no interferir con
+otras instalaciones de Python/PyTorch en el sistema.
+
+```powershell
+# 1) Crear el entorno con Python 3.11 (coincide con la versión objetivo del
+#    repo; onnxruntime-gpu, torch y el resto de wheels tienen soporte sólido)
+conda create -n yolov12 python=3.11 -y
+
+# 2) Activar el entorno (repetir esto en cada sesión de PowerShell nueva
+#    antes de instalar dependencias o lanzar train_yolo12.py)
+conda activate yolov12
+
+# 3) Confirmar que el entorno activo es el correcto
+python --version
+where.exe python
+```
+
+> `where.exe python` debe apuntar a una ruta dentro de
+> `...\anaconda3\envs\yolov12\python.exe` (o `...\miniconda3\envs\...`).
+> Si apunta al Python global del sistema, el entorno no está activado.
+
+Para desactivar el entorno al terminar la sesión: `conda deactivate`.
+Para eliminarlo por completo (p. ej. para reinstalar desde cero):
+`conda env remove -n yolov12`.
+
+## 4. Instalación manual en Windows (ningún script automático)
+
+Ejecutar en PowerShell, con el entorno `yolov12` del §3 ya activado:
 
 ```powershell
 # 1) Actualizar pip
@@ -64,7 +92,7 @@ pip install -e .
 > en CPU/Windows (ver `pyproject.toml:73`). Usa la última estable de la serie
 > `2.5.x`/`2.6.x`/`2.7.x`, o el nightly `cu128` indicado arriba si tu GPU lo requiere.
 
-## 4. Estructura de directorios esperada
+## 5. Estructura de directorios esperada
 
 Ultralytics resuelve el campo `path` de cada `.yaml` de dataset como
 `(datasets_dir / path).resolve()`, donde `datasets_dir` es la carpeta
@@ -73,7 +101,7 @@ configurada en `ultralytics/settings.json` (por defecto, la carpeta hermana
 
 ```
 GitHub/
-├── YOLOv12/                          ← este repo clonado
+├── yolov12/                          ← este repo clonado
 │   ├── requirements.txt              (original, sin tocar)
 │   ├── requirements-windows.txt      (nuevo)
 │   ├── train_yolo12.py               (nuevo)
@@ -104,7 +132,7 @@ GitHub/
   valores por defecto de `ultralytics/cfg/default.yaml` — la única variable
   entre los dos experimentos es el contenido físico de imágenes/etiquetas.
 
-## 5. Hiperparámetros (idénticos en ambos experimentos)
+## 6. Hiperparámetros (idénticos en ambos experimentos)
 
 `train_yolo12.py` **no** pasa overrides de `lr0`, `optimizer`, `mosaic`,
 `mixup`, `fliplr`, `hsv_*`, `degrees`, etc. — todos se heredan sin modificar
@@ -123,9 +151,9 @@ de `ultralytics/cfg/default.yaml`, entre ellos:
 | `close_mosaic` | `10` (últimas 10 épocas sin mosaic) |
 
 Solo se controlan parámetros de **ejecución/hardware** (no de red): `epochs`,
-`imgsz`, `batch`, `workers`, `amp`, `device`, `patience` — ver §7.
+`imgsz`, `batch`, `workers`, `amp`, `device`, `patience` — ver §8.
 
-## 6. Credenciales W&B (seguras, sin hardcodear)
+## 7. Credenciales W&B (seguras, sin hardcodear)
 
 - `.env.example` (versionado en git, sin secretos reales) documenta las
   variables requeridas.
@@ -136,7 +164,9 @@ Solo se controlan parámetros de **ejecución/hardware** (no de red): `epochs`,
 - Cada experimento reporta a un **proyecto W&B independiente**:
   `${WANDB_PROJECT}-Base` y `${WANDB_PROJECT}-Augmented`.
 
-## 7. Ejecutar ambos entrenamientos (PowerShell)
+## 8. Ejecutar ambos entrenamientos (PowerShell)
+
+Con el entorno `yolov12` (§3) activado:
 
 ```powershell
 # Experimento 1: dataset base
@@ -177,7 +207,7 @@ Resultados guardados en carpetas independientes:
 Si aparece `BrokenPipeError` / `EOFError` (multiprocessing en Windows), reduce
 `--workers` a `0`.
 
-## 8. Métricas registradas en W&B
+## 9. Métricas registradas en W&B
 
 La integración nativa de ultralytics (`ultralytics/utils/callbacks/wb.py`,
 activada vía `settings.update({"wandb": True})`) ya registra automáticamente,
@@ -206,7 +236,7 @@ registra las mismas métricas con nombres explícitos bajo el prefijo
   accuracy de clasificación estándar cuando no hay negativos verdaderos
   explícitos por imagen)
 
-## 9. Verificación de GPU (incluida en el script)
+## 10. Verificación de GPU (incluida en el script)
 
 Antes de cada entrenamiento, `train_yolo12.py` imprime y valida:
 
