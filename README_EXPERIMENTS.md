@@ -1,9 +1,13 @@
-﻿# YOLOv12-Large sobre VisDrone (Windows) — Documentación de experimentos
+﻿# YOLOv12-Medium sobre VisDrone (Windows) — Documentación de experimentos
 
 Documentación independiente del flujo de entrenamiento local en Windows para
-`yolo12l.pt` sobre un dataset VisDrone de clase única (`person`), con tracking
+`yolo12m.pt` sobre un dataset VisDrone de clase única (`person`), con tracking
 en Weights & Biases. No modifica `requirements.txt` ni ningún archivo del
 paquete `ultralytics/` original.
+
+> Se cambió de `yolo12l.pt` (Large) a `yolo12m.pt` (Medium): Large exigía
+> demasiado cómputo/VRAM para esta GPU con este dataset (ver el historial de
+> ajustes de `imgsz`/`batch` más abajo, motivado por el mismo problema).
 
 ## 1. Hardware y entorno
 
@@ -13,7 +17,7 @@ paquete `ultralytics/` original.
 | GPU                | NVIDIA GeForce RTX 5060 Ti — 16 GB VRAM |
 | CUDA Toolkit       | 13.3 (driver del sistema)           |
 | Framework          | PyTorch + CUDA (wheel, ver §2)      |
-| Modelo             | YOLOv12-Large (`yolo12l.pt`)        |
+| Modelo             | YOLOv12-Medium (`yolo12m.pt`)       |
 
 > **Nota sobre CUDA 13.3 y wheels de PyTorch (confirmado en esta máquina)**: los
 > wheels oficiales de PyTorch se distribuyen con etiquetas `cuXXX` (p. ej.
@@ -51,7 +55,7 @@ paquete `ultralytics/` original.
 > No es un problema de este repo ni de `requirements-windows.txt`: es una
 > limitación actual del paquete `stringzilla` en Windows, y **afecta a
 > cualquier versión de modelo de ultralytics** (YOLOv12, YOLOv11 `yolo11l.pt`,
-> etc.) que use `albumentations` en Windows — no es específico de `yolo12l.pt`.
+> etc.) que use `albumentations` en Windows — no es específico de `yolo12m.pt`.
 >
 > **Fix (verificado)**: instalar *Build Tools for Visual Studio*
 > (https://visualstudio.microsoft.com/visual-cpp-build-tools/) **no es
@@ -230,7 +234,7 @@ Con el entorno `yolov12` (§3) activado:
 python train_yolo12.py `
     --data data\visdrone_base.yaml `
     --name visdrone_base `
-    --model yolo12l.pt `
+    --model yolo12m.pt `
     --epochs 250 `
     --imgsz 640 `
     --batch 16 `
@@ -240,7 +244,7 @@ python train_yolo12.py `
 python train_yolo12.py `
     --data data\visdrone_augmented.yaml `
     --name visdrone_augmented `
-    --model yolo12l.pt `
+    --model yolo12m.pt `
     --epochs 250 `
     --imgsz 640 `
     --batch 16 `
@@ -257,20 +261,22 @@ de corrida.
 > el tamaño con el que estos modelos fueron ajustados originalmente (COCO). Se
 > probó primero a `1280` (nativo) y luego `960` (punto medio) buscando
 > conservar más detalle para las personas pequeñas/lejanas de VisDrone, pero
-> ambos tamaños son bastante más pesados en memoria y velocidad con
-> YOLOv12-L (los bloques de atención `A2C2f` / Area Attention escalan peor
-> con resolución que una CNN convencional) — `640` prioriza velocidad y
+> ambos tamaños son bastante más pesados en memoria y velocidad con YOLOv12
+> (los bloques de atención `A2C2f` / Area Attention escalan peor con
+> resolución que una CNN convencional) — `640` prioriza velocidad y
 > estabilidad de entrenamiento sobre ese detalle extra. En modo `train`,
 > ultralytics recibe `imgsz` como un único entero que define el lado largo
 > del letterbox cuadrado; el lado corto se rellena (padding) en vez de
-> recortarse o deformarse. **Confirmado en este dataset a `imgsz=1280`**:
-> `batch=8` produce `CUDA OutOfMemoryError` en `TaskAlignedAssigner`
-> (VisDrone tiene muchísimas cajas por imagen, lo que infla el tensor de
-> costo de asignación). A `640px` hay mucho más margen de VRAM (~6.25× menos
-> píxeles que a 1280px), así que `--batch` sube a `16` — no verificado todavía
-> en este dataset a esta resolución; si da `OOM`, baja o usa `--batch -1`
-> (autobatch, deja que ultralytics mida la VRAM libre real) — solo usa el
-> **mismo** valor en ambos experimentos.
+> recortarse o deformarse. **Confirmado en este dataset a `imgsz=1280` con
+> `yolo12l.pt` (Large)**: `batch=8` produce `CUDA OutOfMemoryError` en
+> `TaskAlignedAssigner` (VisDrone tiene muchísimas cajas por imagen, lo que
+> infla el tensor de costo de asignación) — uno de los motivos por los que se
+> pasó a `yolo12m.pt` (Medium), bastante más liviano. A `640px` hay mucho más
+> margen de VRAM (~6.25× menos píxeles que a 1280px) y el modelo es más
+> chico, así que `--batch` sube a `16` — no verificado todavía en este
+> dataset con `yolo12m.pt`; si da `OOM`, baja o usa `--batch -1` (autobatch,
+> deja que ultralytics mida la VRAM libre real) — solo usa el **mismo** valor
+> en ambos experimentos.
 
 > **"El entrenamiento es muy lento / no avanza" (causa raíz confirmada)**: si
 > ves `WARNING: CUDA OutOfMemoryError in TaskAlignedAssigner, using CPU` justo
@@ -283,7 +289,7 @@ de corrida.
 > el `imgsz` (960, luego 640) y el `batch` se reajustara en cada paso (ver
 > nota anterior). Si ya bajaste el batch y sigue lento sin ese warning
 > específico, entran en juego motivos normales de rendimiento: los bloques de
-> atención de YOLOv12-L escalan peor con resolución que una CNN normal, y sin
+> atención de YOLOv12 escalan peor con resolución que una CNN normal, y sin
 > FlashAttention (mensaje `"FlashAttention is not available on this device.
 > Using scaled_dot_product_attention instead."`, normal en Windows) el
 > fallback `scaled_dot_product_attention` es más lento — en una GPU Blackwell
