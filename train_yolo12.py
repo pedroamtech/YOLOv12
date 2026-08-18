@@ -117,9 +117,16 @@ def main() -> None:
     creds = load_credentials()
     verify_gpu()
 
-    wandb.login(key=creds["api_key"])
+    # No se usa wandb.login(key=...): esa función escribe la key en ~/.netrc y
+    # valida que tenga exactamente 40 caracteres (formato clásico de API key
+    # personal), lo que rompe con keys más nuevas con prefijo (p. ej.
+    # "wandb_v1_...", de cuentas de servicio/organización). Exportar la
+    # variable de entorno evita esa validación: wandb.init() (llamado
+    # internamente por el callback nativo de ultralytics) la toma directo y
+    # autentica contra el backend real, que es la validación que importa.
+    os.environ["WANDB_API_KEY"] = creds["api_key"]
     if creds["entity"]:
-        os.environ["WANDB_ENTITY"] = creds["entity"]  # wandb.init() (llamado internamente por ultralytics) lo respeta
+        os.environ["WANDB_ENTITY"] = creds["entity"]
     settings.update({"wandb": True})  # habilita la integración nativa de ultralytics con W&B
 
     args = parse_args()

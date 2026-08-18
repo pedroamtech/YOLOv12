@@ -189,11 +189,22 @@ Solo se controlan parámetros de **ejecución/hardware** (no de red): `epochs`,
 - `.env.example` (versionado en git, sin secretos reales) documenta las
   variables requeridas.
 - `.env` (NO versionado, ver `.gitignore`) contiene tu `WANDB_API_KEY` real.
-- `train_yolo12.py` carga `.env` con `python-dotenv` y llama a
-  `wandb.login(key=...)` antes de entrenar; si `WANDB_API_KEY` falta, el
-  script aborta con un mensaje claro en vez de entrenar sin tracking.
+- `train_yolo12.py` carga `.env` con `python-dotenv`; si `WANDB_API_KEY` falta,
+  el script aborta con un mensaje claro en vez de entrenar sin tracking.
 - Cada experimento reporta a un **proyecto W&B independiente**:
   `${WANDB_PROJECT}-Base` y `${WANDB_PROJECT}-Augmented`.
+
+> **Por qué no se usa `wandb.login(key=...)` (error corregido)**: esa función
+> escribe la key en `~/.netrc` y valida que tenga exactamente 40 caracteres —
+> el formato clásico de API key personal (`https://wandb.ai/authorize`). Con
+> keys más nuevas con prefijo (p. ej. `wandb_v1_...`, típicas de cuentas de
+> servicio/organización) falla con
+> `ValueError: API key must be 40 characters long, yours was 86` aunque la key
+> sea completamente válida. El script en su lugar exporta
+> `os.environ["WANDB_API_KEY"]` directamente; `wandb.init()` (llamado
+> internamente por el callback nativo de ultralytics al arrancar el
+> entrenamiento) la toma de ahí sin pasar por esa validación de longitud, y
+> autentica contra el backend real de W&B.
 
 ## 8. Ejecutar ambos entrenamientos (PowerShell)
 
