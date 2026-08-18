@@ -145,8 +145,8 @@ python train_yolo12.py `
     --name visdrone_base `
     --model yolo12l.pt `
     --epochs 100 `
-    --imgsz 640 `
-    --batch 16 `
+    --imgsz 1280 `
+    --batch 8 `
     --workers 2
 
 # Experimento 2: dataset aumentado (offline)
@@ -155,8 +155,8 @@ python train_yolo12.py `
     --name visdrone_augmented `
     --model yolo12l.pt `
     --epochs 100 `
-    --imgsz 640 `
-    --batch 16 `
+    --imgsz 1280 `
+    --batch 8 `
     --workers 2
 ```
 
@@ -164,10 +164,18 @@ Resultados guardados en carpetas independientes:
 `runs/YOLOv12-VisDrone-Base/visdrone_base/` y
 `runs/YOLOv12-VisDrone-Augmented/visdrone_augmented/`.
 
+> **Resolución de imagen (720p)**: las imágenes fuente son 1280×720. En modo
+> `train`, ultralytics recibe `imgsz` como un único entero que define el lado
+> largo del letterbox cuadrado (aquí `1280`); el lado corto se rellena
+> (padding) en vez de recortarse o deformarse, así que no se pierde detalle.
+> Con YOLOv12-L, los bloques de atención (`A2C2f` / Area Attention) escalan en
+> memoria más que una CNN convencional al subir la resolución, por eso el
+> `--batch` por defecto baja de 16 (a 640px) a 8 (a 1280px) para evitar OOM en
+> 16 GB de VRAM. Si aun así hay `OOM`, baja `--batch` a `4` o usa `--batch -1`
+> (autobatch); si sobra VRAM, puedes subirlo con margen.
+
 Si aparece `BrokenPipeError` / `EOFError` (multiprocessing en Windows), reduce
-`--workers` a `0`. Si aparece un error de memoria (`OOM`), reduce `--batch`
-(p. ej. `8`) o usa `--batch -1` para autobatch (ultralytics calcula el batch
-óptimo según la VRAM libre).
+`--workers` a `0`.
 
 ## 8. Métricas registradas en W&B
 
