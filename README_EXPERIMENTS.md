@@ -1,4 +1,4 @@
-# YOLOv12-Large sobre VisDrone (Windows) — Documentación de experimentos
+﻿# YOLOv12-Large sobre VisDrone (Windows) — Documentación de experimentos
 
 Documentación independiente del flujo de entrenamiento local en Windows para
 `yolo12l.pt` sobre un dataset VisDrone de clase única (`person`), con tracking
@@ -174,7 +174,7 @@ python train_yolo12.py `
     --data data\visdrone_base.yaml `
     --name visdrone_base `
     --model yolo12l.pt `
-    --epochs 100 `
+    --epochs 250 `
     --imgsz 1280 `
     --batch 8 `
     --workers 2
@@ -184,7 +184,7 @@ python train_yolo12.py `
     --data data\visdrone_augmented.yaml `
     --name visdrone_augmented `
     --model yolo12l.pt `
-    --epochs 100 `
+    --epochs 250 `
     --imgsz 1280 `
     --batch 8 `
     --workers 2
@@ -249,3 +249,4 @@ torch.cuda.get_device_capability(0)
 
 Si `torch.cuda.is_available()` es `False`, el script aborta antes de cargar
 el dataset o inicializar W&B.
+
