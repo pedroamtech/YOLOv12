@@ -180,11 +180,7 @@ C:\Users\pedroam\Documents\Data-Augmentation\Datasets-Clean\VisDrone\
 
 > **Partición 80/20**: el dataset base quedó reparticionado en 6890 imágenes
 > de entrenamiento y 1723 de validación sobre un total de 8613 — exactamente
-> 80.00%/20.00%. Es un cambio de partición sobre el mismo conjunto total de
-> imágenes (antes dividido de forma distinta entre `train`/`validation`); la
-> carpeta de validación se renombró de `validation` a `val`, por lo que
-> `data/visdrone_base.yaml` apunta a `val: val/images` (no
-> `val: validation/images`).
+> 80.00%/20.00%.
 
 `data/visdrone_augmented.yaml` (dataset aumentado) **todavía usa una ruta
 relativa placeholder** (`../datasets/VisDrone_Augmented`, resuelta por
