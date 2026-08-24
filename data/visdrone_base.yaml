@@ -9,7 +9,7 @@
 
 path: C:/Users/pedroam/Documents/Data-Augmentation/Datasets-Clean/VisDrone # raíz del dataset
 train: train/images # imágenes de entrenamiento (relativas a 'path')
-val: validation/images # imágenes de validación (relativas a 'path')
+val: val/images # imágenes de validación (relativas a 'path')
 test: # opcional
 
 # Classes

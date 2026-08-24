@@ -171,12 +171,20 @@ Apunta al dataset real, confirmado en disco:
 ```
 C:\Users\pedroam\Documents\Data-Augmentation\Datasets-Clean\VisDrone\
 ├── train\
-│   ├── images\        (8081 imágenes)
-│   └── labels\         (8081 .txt, YOLO: class x_center y_center w h, normalizado 0-1)
-└── validation\
-    ├── images\        (532 imágenes)
-    └── labels\         (532 .txt)
+│   ├── images\        (6890 imágenes)
+│   └── labels\         (6890 .txt, YOLO: class x_center y_center w h, normalizado 0-1)
+└── val\
+    ├── images\        (1723 imágenes)
+    └── labels\         (1723 .txt)
 ```
+
+> **Partición 80/20**: el dataset base quedó reparticionado en 6890 imágenes
+> de entrenamiento y 1723 de validación sobre un total de 8613 — exactamente
+> 80.00%/20.00%. Es un cambio de partición sobre el mismo conjunto total de
+> imágenes (antes dividido de forma distinta entre `train`/`validation`); la
+> carpeta de validación se renombró de `validation` a `val`, por lo que
+> `data/visdrone_base.yaml` apunta a `val: val/images` (no
+> `val: validation/images`).
 
 `data/visdrone_augmented.yaml` (dataset aumentado) **todavía usa una ruta
 relativa placeholder** (`../datasets/VisDrone_Augmented`, resuelta por
@@ -364,7 +372,7 @@ sección 9.
 
   | Parámetro | Valor en `default.yaml` | Qué pasa realmente en tiempo de ejecución |
   |---|---|---|
-  | `optimizer` | `auto` | `build_optimizer` (`ultralytics/engine/trainer.py:759-788`): con `nc=1`, `epochs=250`, `batch=16` (`nbs=64`), `iterations = ceil(8081/64) * 250 = 31.750`, muy por encima del umbral de `10.000` que decide entre SGD y AdamW — resuelve a **`SGD(lr=0.01, momentum=0.9)`** |
+  | `optimizer` | `auto` | `build_optimizer` (`ultralytics/engine/trainer.py:759-788`): con `nc=1`, `epochs=250`, `batch=16` (`nbs=64`), `iterations = ceil(6890/64) * 250 = 27.000`, muy por encima del umbral de `10.000` que decide entre SGD y AdamW — resuelve a **`SGD(lr=0.01, momentum=0.9)`** |
   | `lr0` | `0.01` | Coincide con el `lr` real solo porque la rama SGD de `optimizer: auto` también hardcodea `lr=0.01` — no es un traspaso directo del valor de `default.yaml` |
   | `lrf` | `0.01` | Fracción final: la LR decae hasta `lr0 × lrf = 0.0001` al terminar las 250 épocas |
   | `momentum` | `0.937` | **Se ignora al construir el optimizador**: la rama SGD de `optimizer: auto` hardcodea `momentum=0.9` en una variable local (`trainer.py:787`), sin reescribir `self.args.momentum` — confirmado en el log: `ignoring 'lr0=0.01' and 'momentum=0.937' [...] determining best [...] automatically`. El `SGD(lr=0.01, momentum=0.9)` que se imprime al arrancar es solo el valor de construcción — ver la fila `warmup_momentum` para el valor que termina quedando vigente |
