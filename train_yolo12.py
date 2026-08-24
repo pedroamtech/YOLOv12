@@ -1,8 +1,10 @@
-"""Entrenamiento de YOLOv12-Medium sobre VisDrone (clase única "person") en Windows.
+"""Entrenamiento de YOLOv12 (Nano/Small) sobre VisDrone (clase única "person") en Windows.
 
 Uso:
-    python train_yolo12.py --data data/visdrone_base.yaml      --name visdrone_base
-    python train_yolo12.py --data data/visdrone_augmented.yaml --name visdrone_augmented
+    python train_yolo12.py --data data/visdrone_base.yaml      --name visdrone_base_n --model yolo12n.pt
+    python train_yolo12.py --data data/visdrone_augmented.yaml --name visdrone_augmented_n --model yolo12n.pt
+    python train_yolo12.py --data data/visdrone_base.yaml      --name visdrone_base_s --model yolo12s.pt
+    python train_yolo12.py --data data/visdrone_augmented.yaml --name visdrone_augmented_s --model yolo12s.pt
 
 Este script deliberadamente NO expone ni sobreescribe hiperparámetros de red
 (lr0, optimizer, mosaic, mixup, fliplr, etc.): ambos experimentos deben usar
@@ -98,10 +100,10 @@ def make_wandb_metric_logger():
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Entrena YOLOv12-Medium sobre VisDrone en Windows")
+    parser = argparse.ArgumentParser(description="Entrena YOLOv12 (Nano/Small) sobre VisDrone en Windows")
     parser.add_argument("--data", required=True, help="Ruta al .yaml del dataset (data/visdrone_base.yaml o data/visdrone_augmented.yaml)")
-    parser.add_argument("--name", required=True, help="Nombre de la corrida (subcarpeta de resultados y run de W&B)")
-    parser.add_argument("--model", default="yolo12m.pt", help="Pesos/config del modelo (default: yolo12m.pt; se cambió de yolo12l.pt por menor demanda de cómputo/VRAM)")
+    parser.add_argument("--name", required=True, help="Nombre de la corrida, único por combinación modelo+dataset (subcarpeta de resultados y run de W&B); usa exist_ok=True, así que nombres repetidos se sobrescriben localmente")
+    parser.add_argument("--model", default="yolo12n.pt", help="Pesos/config del modelo: yolo12n.pt o yolo12s.pt (alcance actual del proyecto; Medium/Large quedaron descartados por cómputo/VRAM)")
     parser.add_argument("--epochs", type=int, default=250)
     parser.add_argument("--imgsz", type=int, default=640, help="Tamaño estándar de entrenamiento YOLO (default de ultralytics/cfg/default.yaml); imágenes fuente en 720p (1280x720) se reescalan al lado largo")
     parser.add_argument("--batch", type=int, default=16, help="16 GB VRAM: a 640px hay mucho más margen que a 960/1280px (donde 8 y hasta 4 llegaron a dar OOM en TaskAlignedAssigner con este dataset); 16 no está verificado todavía en este dataset — si da OOM, baja o usa -1 para autobatch")

@@ -1,13 +1,17 @@
-# YOLOv12-Medium sobre VisDrone (Windows) — Documentación de experimentos
+# YOLOv12 Nano/Small sobre VisDrone (Windows) — Documentación de experimentos
 
 Documentación independiente del flujo de entrenamiento local en Windows para
-`yolo12m.pt` sobre un dataset VisDrone de clase única (`person`), con tracking
-en Weights & Biases. No modifica `requirements.txt` ni ningún archivo del
-paquete `ultralytics/` original.
+`yolo12n.pt`/`yolo12s.pt` sobre un dataset VisDrone de clase única (`person`),
+con tracking en Weights & Biases. No modifica `requirements.txt` ni ningún
+archivo del paquete `ultralytics/` original.
 
-> Se cambió de `yolo12l.pt` (Large) a `yolo12m.pt` (Medium): Large exigía
-> demasiado cómputo/VRAM para esta GPU con este dataset (ver el historial de
-> ajustes de `imgsz`/`batch` más abajo, motivado por el mismo problema).
+> **Alcance actual: solo Nano y Small.** Se probó primero con `yolo12l.pt`
+> (Large) — exigía demasiado cómputo/VRAM para esta GPU con este dataset (ver
+> el historial de ajustes de `imgsz`/`batch` más abajo) — y después con
+> `yolo12m.pt` (Medium), pero el alcance del proyecto se redujo a Nano y
+> Small únicamente. `--model yolo12m.pt` (o `yolo12l.pt`) sigue siendo
+> técnicamente válido si hiciera falta retomarlos: el script no cambió, solo
+> el plan de experimentos documentado aquí.
 
 ## Instrucciones de ejecución
 
@@ -23,7 +27,8 @@ Sigue este orden para reproducir el experimento sin errores:
    No toques los hiperparámetros de red (sección 6) — deben quedar idénticos entre
    Experimento 1 y 2.
 3. **Ejecución**: corre `train_yolo12.py` con los comandos de PowerShell de
-   la sección 8, uno por experimento (Base y Augmented).
+   la sección 8 — cuatro corridas: Nano y Small, cada uno con Base y
+   Augmented.
 4. **Resolución de problemas**: si algo falla o los resultados difieren de
    lo esperado, revisa la sección 11 al final de este documento — reúne los
    problemas ya encontrados y resueltos durante estas pruebas (build de
@@ -38,7 +43,7 @@ Sigue este orden para reproducir el experimento sin errores:
 | GPU                | NVIDIA GeForce RTX 5060 Ti — 16 GB VRAM |
 | CUDA Toolkit       | 13.3 (driver del sistema)           |
 | Framework          | PyTorch + CUDA (wheel, ver sección 2)      |
-| Modelo             | YOLOv12-Medium (`yolo12m.pt`)       |
+| Modelo             | YOLOv12 Nano (`yolo12n.pt`) y Small (`yolo12s.pt`) |
 
 > **Nota sobre CUDA 13.3 y wheels de PyTorch (confirmado en esta máquina)**: los
 > wheels oficiales de PyTorch se distribuyen con etiquetas `cuXXX` (p. ej.
@@ -76,7 +81,8 @@ Sigue este orden para reproducir el experimento sin errores:
 > No es un problema de este repo ni de `requirements-windows.txt`: es una
 > limitación actual del paquete `stringzilla` en Windows, y **afecta a
 > cualquier versión de modelo de ultralytics** (YOLOv12, YOLOv11 `yolo11l.pt`,
-> etc.) que use `albumentations` en Windows — no es específico de `yolo12m.pt`.
+> etc.) que use `albumentations` en Windows — no es específico de ningún
+> tamaño de YOLOv12 en particular (`yolo12n.pt`, `yolo12s.pt`, etc.).
 >
 > **Fix (verificado)**: instalar *Build Tools for Visual Studio*
 > (https://visualstudio.microsoft.com/visual-cpp-build-tools/) **no es
@@ -246,89 +252,10 @@ Solo se controlan parámetros de **ejecución/hardware** (no de red): `epochs`,
 > que ya hay un run activo (`wb.run`) y solo loguea métricas en él, sin
 > volver a llamar a `wb.init()`.
 
-## 8. Ejecutar ambos entrenamientos (PowerShell)
+## 8. Ejecutar los entrenamientos (PowerShell)
 
-Con el entorno `yolov12` (sección 3) activado:
-
-```powershell
-# Experimento 1: dataset base
-python train_yolo12.py `
-    --data data\visdrone_base.yaml `
-    --name visdrone_base `
-    --model yolo12m.pt `
-    --epochs 250 `
-    --imgsz 640 `
-    --batch 16 `
-    --workers 8
-
-# Experimento 2: dataset aumentado (offline)
-python train_yolo12.py `
-    --data data\visdrone_augmented.yaml `
-    --name visdrone_augmented `
-    --model yolo12m.pt `
-    --epochs 250 `
-    --imgsz 640 `
-    --batch 16 `
-    --workers 8
-```
-
-Resultados locales en subcarpetas independientes dentro del mismo proyecto:
-`runs/YOLOv12/visdrone_base/` y `runs/YOLOv12/visdrone_augmented/`. En W&B,
-ambas corridas caen en el mismo proyecto (`YOLOv12`), distinguidas por nombre
-de corrida.
-
-> **Resolución de imagen (bajada al estándar YOLO, 640)**: las imágenes fuente
-> son 1280×720; `imgsz=640` es el default de `ultralytics/cfg/default.yaml` y
-> el tamaño con el que estos modelos fueron ajustados originalmente (COCO). Se
-> probó primero a `1280` (nativo) y luego `960` (punto medio) buscando
-> conservar más detalle para las personas pequeñas/lejanas de VisDrone, pero
-> ambos tamaños son bastante más pesados en memoria y velocidad con YOLOv12
-> (los bloques de atención `A2C2f` / Area Attention escalan peor con
-> resolución que una CNN convencional) — `640` prioriza velocidad y
-> estabilidad de entrenamiento sobre ese detalle extra. En modo `train`,
-> ultralytics recibe `imgsz` como un único entero que define el lado largo
-> del letterbox cuadrado; el lado corto se rellena (padding) en vez de
-> recortarse o deformarse. **Confirmado en este dataset a `imgsz=1280` con
-> `yolo12l.pt` (Large)**: `batch=8` produce `CUDA OutOfMemoryError` en
-> `TaskAlignedAssigner` (VisDrone tiene muchísimas cajas por imagen, lo que
-> infla el tensor de costo de asignación) — uno de los motivos por los que se
-> pasó a `yolo12m.pt` (Medium), bastante más liviano. A `640px` hay mucho más
-> margen de VRAM (~6.25× menos píxeles que a 1280px) y el modelo es más
-> chico, así que `--batch` sube a `16` — no verificado todavía en este
-> dataset con `yolo12m.pt`; si da `OOM`, baja o usa `--batch -1` (autobatch,
-> deja que ultralytics mida la VRAM libre real) — solo usa el **mismo** valor
-> en ambos experimentos.
-
-> **"El entrenamiento es muy lento / no avanza" (causa raíz confirmada)**: si
-> ves `WARNING: CUDA OutOfMemoryError in TaskAlignedAssigner, using CPU` justo
-> al arrancar la época 1, **esa es la causa** — no un cuelgue. Ultralytics
-> atrapa el `OutOfMemoryError` en ese paso puntual y hace fallback silencioso
-> a CPU (mueve los tensores GPU→CPU, calcula ahí, los regresa a GPU), **en
-> cada iteración**, lo que hace que la GPU se vea casi al límite de uso pero
-> el entrenamiento avance extremadamente lento. Esto fue justo lo que pasó
-> con `batch=8` a `imgsz=1280` en este dataset — de ahí que se bajara primero
-> el `imgsz` (960, luego 640) y el `batch` se reajustara en cada paso (ver
-> nota anterior). Si ya bajaste el batch y sigue lento sin ese warning
-> específico, entran en juego motivos normales de rendimiento: los bloques de
-> atención de YOLOv12 escalan peor con resolución que una CNN normal, y sin
-> FlashAttention (mensaje `"FlashAttention is not available on this device.
-> Using scaled_dot_product_attention instead."`, normal en Windows) el
-> fallback `scaled_dot_product_attention` es más lento — en una GPU Blackwell
-> tan reciente como la RTX 5060 Ti, los kernels siguen madurando. Revisa el
-> `s/it` / `ETA` de la barra de progreso: si el ETA es de horas por época, es
-> lento, no un cuelgue. `--workers` por defecto es `8` — en una CPU con varios
-> núcleos, un valor bajo deja el preprocesamiento (mosaic + albumentations a
-> 1280px) como cuello de botella. Ajusta `--workers` según los núcleos lógicos
-> de tu CPU (el script avisa si lo pasas por encima); si aparece
-> `BrokenPipeError` / `EOFError` (multiprocessing en Windows), baja
-> `--workers` a `0`.
-
-### Otros tamaños de modelo (nano, small)
-
-No hace falta modificar `train_yolo12.py` para probar otros tamaños de
-YOLOv12 — `--model`, `--data` y `--name` ya son parámetros de línea de
-comandos. Para correr Nano y Small (cada uno con Base y Augmented), solo
-cambia esos tres flags:
+Con el entorno `yolov12` (sección 3) activado. Alcance actual: cuatro
+corridas — Nano y Small, cada uno con Base y Augmented:
 
 ```powershell
 # Nano — dataset base
@@ -374,16 +301,98 @@ python train_yolo12.py `
 
 > **`--name` único por combinación**: como el script usa `exist_ok=True` en
 > `model.train()`, si dos corridas comparten `--name` se sobrescriben entre sí
-> en `runs/YOLOv12/<name>/` — por eso el
-> sufijo `_n`/`_s` (y `_base`/`_augmented` ya existente) en vez de reutilizar
-> `visdrone_base`/`visdrone_augmented` tal cual. En W&B no hay riesgo de
-> sobrescritura (cada corrida crea un run nuevo aunque el nombre se repita),
-> pero mantener nombres únicos también ordena mejor el dashboard.
->
-> `--batch 16` queda igual que en Medium — Nano y Small consumen bastante
-> menos VRAM, así que hay margen de sobra; no es obligatorio subirlo, pero sí
-> viable si quieres aprovechar más GPU. El resto de hiperparámetros de red
-> (sección 6) se mantiene sin overrides igual que en los demás experimentos.
+> en `runs/YOLOv12/<name>/` — por eso el sufijo `_n`/`_s` combinado con
+> `_base`/`_augmented`. En W&B no hay riesgo de sobrescritura (cada corrida
+> crea un run nuevo aunque el nombre se repita), pero nombres únicos también
+> ordenan mejor el dashboard.
+
+Resultados locales en subcarpetas independientes dentro del mismo proyecto:
+`runs/YOLOv12/visdrone_base_n/`, `runs/YOLOv12/visdrone_augmented_n/`,
+`runs/YOLOv12/visdrone_base_s/` y `runs/YOLOv12/visdrone_augmented_s/`. En
+W&B, las cuatro corridas caen en el mismo proyecto (`YOLOv12`), distinguidas
+por nombre de corrida.
+
+> **Resolución de imagen (bajada al estándar YOLO, 640)**: las imágenes fuente
+> son 1280×720; `imgsz=640` es el default de `ultralytics/cfg/default.yaml` y
+> el tamaño con el que estos modelos fueron ajustados originalmente (COCO). Se
+> probó primero a `1280` (nativo) y luego `960` (punto medio) buscando
+> conservar más detalle para las personas pequeñas/lejanas de VisDrone, pero
+> ambos tamaños son bastante más pesados en memoria y velocidad con YOLOv12
+> (los bloques de atención `A2C2f` / Area Attention escalan peor con
+> resolución que una CNN convencional) — `640` prioriza velocidad y
+> estabilidad de entrenamiento sobre ese detalle extra. En modo `train`,
+> ultralytics recibe `imgsz` como un único entero que define el lado largo
+> del letterbox cuadrado; el lado corto se rellena (padding) en vez de
+> recortarse o deformarse. **Confirmado en este dataset a `imgsz=1280` con
+> `yolo12l.pt` (Large)**: `batch=8` produce `CUDA OutOfMemoryError` en
+> `TaskAlignedAssigner` (VisDrone tiene muchísimas cajas por imagen, lo que
+> infla el tensor de costo de asignación) — uno de los motivos por los que se
+> pasó primero a `yolo12m.pt` (Medium) y después se redujo el alcance del
+> proyecto a Nano y Small únicamente, ambos bastante más livianos. A `640px`
+> hay mucho más margen de VRAM (~6.25× menos píxeles que a 1280px) y estos
+> modelos son mucho más chicos que Large, así que `--batch` sube a `16` — no
+> verificado todavía en este dataset con Nano/Small (debería sobrar VRAM,
+> dado que ni Medium llegó a probarse a fondo a esta resolución); si da
+> `OOM`, baja o usa `--batch -1` (autobatch, deja que ultralytics mida la
+> VRAM libre real) — solo usa el **mismo** valor en las cuatro corridas.
+
+> **"El entrenamiento es muy lento / no avanza" (causa raíz confirmada)**: si
+> ves `WARNING: CUDA OutOfMemoryError in TaskAlignedAssigner, using CPU` justo
+> al arrancar la época 1, **esa es la causa** — no un cuelgue. Ultralytics
+> atrapa el `OutOfMemoryError` en ese paso puntual y hace fallback silencioso
+> a CPU (mueve los tensores GPU→CPU, calcula ahí, los regresa a GPU), **en
+> cada iteración**, lo que hace que la GPU se vea casi al límite de uso pero
+> el entrenamiento avance extremadamente lento. Esto fue justo lo que pasó
+> con `batch=8` a `imgsz=1280` en este dataset — de ahí que se bajara primero
+> el `imgsz` (960, luego 640) y el `batch` se reajustara en cada paso (ver
+> nota anterior). Si ya bajaste el batch y sigue lento sin ese warning
+> específico, entran en juego motivos normales de rendimiento: los bloques de
+> atención de YOLOv12 escalan peor con resolución que una CNN normal, y sin
+> FlashAttention (mensaje `"FlashAttention is not available on this device.
+> Using scaled_dot_product_attention instead."`, normal en Windows) el
+> fallback `scaled_dot_product_attention` es más lento — en una GPU Blackwell
+> tan reciente como la RTX 5060 Ti, los kernels siguen madurando. Revisa el
+> `s/it` / `ETA` de la barra de progreso: si el ETA es de horas por época, es
+> lento, no un cuelgue. `--workers` por defecto es `8` — en una CPU con varios
+> núcleos, un valor bajo deja el preprocesamiento (mosaic + albumentations a
+> 1280px) como cuello de botella. Ajusta `--workers` según los núcleos lógicos
+> de tu CPU (el script avisa si lo pasas por encima); si aparece
+> `BrokenPipeError` / `EOFError` (multiprocessing en Windows), baja
+> `--workers` a `0`.
+
+### Otros tamaños de modelo (Medium, Large — no usados actualmente)
+
+Fuera del alcance actual del proyecto (ver nota al inicio del documento),
+pero el script no cambió — `--model`, `--data` y `--name` siguen siendo
+parámetros de línea de comandos, así que retomar Medium o Large no requiere
+tocar código, solo estos comandos de referencia:
+
+```powershell
+# Medium — dataset base
+python train_yolo12.py `
+    --data data\visdrone_base.yaml `
+    --name visdrone_base_m `
+    --model yolo12m.pt `
+    --epochs 250 `
+    --imgsz 640 `
+    --batch 16 `
+    --workers 8
+
+# Medium — dataset aumentado (offline)
+python train_yolo12.py `
+    --data data\visdrone_augmented.yaml `
+    --name visdrone_augmented_m `
+    --model yolo12m.pt `
+    --epochs 250 `
+    --imgsz 640 `
+    --batch 16 `
+    --workers 8
+```
+
+> `yolo12l.pt` (Large) ya se probó y confirmó demasiado pesado para esta GPU
+> con este dataset a `imgsz=1280` (ver nota de resolución más arriba); no se
+> recomienda reintentarlo sin bajar `--batch` agresivamente o usar
+> `--batch -1` (autobatch).
 
 ## 9. Métricas registradas en W&B
 
