@@ -323,6 +323,68 @@ de corrida.
 > `BrokenPipeError` / `EOFError` (multiprocessing en Windows), baja
 > `--workers` a `0`.
 
+### Otros tamaños de modelo (nano, small)
+
+No hace falta modificar `train_yolo12.py` para probar otros tamaños de
+YOLOv12 — `--model`, `--data` y `--name` ya son parámetros de línea de
+comandos. Para correr Nano y Small (cada uno con Base y Augmented), solo
+cambia esos tres flags:
+
+```powershell
+# Nano — dataset base
+python train_yolo12.py `
+    --data data\visdrone_base.yaml `
+    --name visdrone_base_n `
+    --model yolo12n.pt `
+    --epochs 250 `
+    --imgsz 640 `
+    --batch 16 `
+    --workers 8
+
+# Nano — dataset aumentado (offline)
+python train_yolo12.py `
+    --data data\visdrone_augmented.yaml `
+    --name visdrone_augmented_n `
+    --model yolo12n.pt `
+    --epochs 250 `
+    --imgsz 640 `
+    --batch 16 `
+    --workers 8
+
+# Small — dataset base
+python train_yolo12.py `
+    --data data\visdrone_base.yaml `
+    --name visdrone_base_s `
+    --model yolo12s.pt `
+    --epochs 250 `
+    --imgsz 640 `
+    --batch 16 `
+    --workers 8
+
+# Small — dataset aumentado (offline)
+python train_yolo12.py `
+    --data data\visdrone_augmented.yaml `
+    --name visdrone_augmented_s `
+    --model yolo12s.pt `
+    --epochs 250 `
+    --imgsz 640 `
+    --batch 16 `
+    --workers 8
+```
+
+> **`--name` único por combinación**: como el script usa `exist_ok=True` en
+> `model.train()`, si dos corridas comparten `--name` se sobrescriben entre sí
+> en `runs/YOLOv12/<name>/` — por eso el
+> sufijo `_n`/`_s` (y `_base`/`_augmented` ya existente) en vez de reutilizar
+> `visdrone_base`/`visdrone_augmented` tal cual. En W&B no hay riesgo de
+> sobrescritura (cada corrida crea un run nuevo aunque el nombre se repita),
+> pero mantener nombres únicos también ordena mejor el dashboard.
+>
+> `--batch 16` queda igual que en Medium — Nano y Small consumen bastante
+> menos VRAM, así que hay margen de sobra; no es obligatorio subirlo, pero sí
+> viable si quieres aprovechar más GPU. El resto de hiperparámetros de red
+> (sección 6) se mantiene sin overrides igual que en los demás experimentos.
+
 ## 9. Métricas registradas en W&B
 
 La integración nativa de ultralytics (`ultralytics/utils/callbacks/wb.py`,
