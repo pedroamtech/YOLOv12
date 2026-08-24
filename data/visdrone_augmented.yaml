@@ -1,11 +1,11 @@
 # Ultralytics YOLO 🚀 - Dataset config: VisDrone (AUMENTADO offline)
-# Experimento 2: mismo dataset base, pero procesado previamente con un pipeline de
+# Dataset aumentado: mismo dataset base, pero procesado previamente con un pipeline de
 # aumento de datos OFFLINE (fuera de ultralytics), guardado en su propia carpeta.
 #
 # Los hiperparámetros de red y los aumentos on-the-fly de YOLO (mosaic, mixup,
 # fliplr, hsv, etc.) se mantienen IDÉNTICOS a visdrone_base.yaml — no se modifica
 # nada en ultralytics/cfg/default.yaml ni se pasan overrides de hyp en train_yolo12.py.
-# La única variable entre Experimento 1 y 2 es el contenido de las imágenes/etiquetas.
+# La única variable entre el dataset base y el aumentado es el contenido de las imágenes/etiquetas.
 
 path: ../datasets/VisDrone_Augmented # raíz del dataset (relativa a datasets_dir)
 train: images/train # imágenes de entrenamiento (relativas a 'path')

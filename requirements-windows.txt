@@ -1,6 +1,6 @@
 # ============================================================================
 # requirements-windows.txt
-# Dependencias para entrenar YOLOv12-Large en Windows 11 (RTX 5060 Ti, 16GB VRAM)
+# Dependencias para entrenar YOLOv12 (Nano/Small) en Windows 11 (RTX 5060 Ti, 16GB VRAM)
 #
 # Archivo INDEPENDIENTE de requirements.txt (el original del repo NO se modifica).
 # Diferencias frente a requirements.txt original: ver README_EXPERIMENTS.md

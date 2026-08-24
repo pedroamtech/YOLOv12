@@ -32,8 +32,9 @@ Sigue este orden para reproducir el experimento sin errores:
 4. **Resolución de problemas**: si algo falla o los resultados difieren de
    lo esperado, revisa la sección 12 al final de este documento — reúne los
    problemas encontrados y resueltos durante estas pruebas (build de
-   `stringzilla`, autenticación de W&B, OOM en `TaskAlignedAssigner`,
-   entrenamiento lento).
+   `stringzilla`, longitud de la API key de W&B, nombre de proyecto de W&B
+   con caracteres inválidos, OOM en `TaskAlignedAssigner`, entrenamiento
+   lento, `cu124` incompatible con Blackwell).
 
 ## 1. Hardware y entorno
 
@@ -56,8 +57,12 @@ Sigue este orden para reproducir el experimento sin errores:
 > `True` (por eso es engañoso — solo verifica que hay GPU + driver, no que
 > el build tenga kernels para esa arquitectura), PyTorch advierte
 > explícitamente `NVIDIA GeForce RTX 5060 Ti with CUDA capability sm_120 is
-> not compatible with the current PyTorch installation` (soporta hasta
-> `sm_90`, RTX 40). El fix confirmado es reinstalar con **`cu128`** (comando
+> not compatible with the current PyTorch installation` (lista textual de
+> capacidades soportadas por ese build: `sm_50 sm_60 sm_61 sm_70 sm_75 sm_80
+> sm_86 sm_90` — `sm_86` es RTX 30, la última serie de consumo listada;
+> `sm_90` es Hopper/H100, de datacenter, no RTX 40 (`sm_89`), que ni
+> siquiera aparece en la lista). El fix confirmado es reinstalar con
+> **`cu128`** (comando
 > exacto en sección 4).
 
 ## 2. Diferencias: `requirements.txt` (original) vs `requirements-windows.txt` (nuevo)
@@ -467,8 +472,9 @@ python train_yolo12.py `
 
 > **`--name` único por combinación**: el script usa `exist_ok=True` en
 > `model.train()`, así que dos corridas con el mismo `--name` se sobrescriben
-> entre sí en `runs/YOLOv12/<name>/` — de ahí el sufijo `_n`/`_s` combinado
-> con `_base`/`_augmented`. En W&B no hay riesgo de sobrescritura (cada
+> entre sí en `runs/YOLOv12/<name>/` — de ahí `nano`/`small` como prefijo
+> combinado con `_base`/`_augmented` como sufijo, en vez de reutilizar el
+> mismo nombre para las cuatro corridas. En W&B no hay riesgo de sobrescritura (cada
 > corrida crea un run nuevo aunque el nombre se repita); se mantienen
 > nombres únicos igual, para que el dashboard quede ordenado.
 
