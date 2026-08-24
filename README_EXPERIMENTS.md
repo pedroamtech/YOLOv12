@@ -194,10 +194,10 @@ GitHub/
 │   │   └── visdrone_augmented.yaml   (pendiente de ruta real)
 │   └── runs/                         ← resultados (gitignored)
 │       └── YOLOv12/                  ← un solo proyecto W&B; modelo/dataset se distinguen por --name
-│           ├── visdrone_base_n/
-│           ├── visdrone_augmented_n/
-│           ├── visdrone_base_s/
-│           └── visdrone_augmented_s/
+│           ├── nano_base/
+│           ├── nano_augmented/
+│           ├── small_base/
+│           └── small_augmented/
 └── datasets/                         ← gitignored; solo necesario para el dataset aumentado
     └── VisDrone_Augmented/
         ├── images/{train,val}/*.jpg  ← salida del pipeline de aumento offline
@@ -293,8 +293,8 @@ sección 8.
   tracking.
 - Las cuatro corridas reportan al **mismo proyecto W&B** (`${WANDB_PROJECT}`,
   p. ej. `YOLOv12`); modelo (Nano/Small) y dataset (Base/Augmented) se
-  distinguen por el **nombre de la corrida** (`--name visdrone_base_n`,
-  `visdrone_augmented_n`, `visdrone_base_s`, `visdrone_augmented_s`), no por
+  distinguen por el **nombre de la corrida** (`--name nano_base`,
+  `nano_augmented`, `small_base`, `small_augmented`), no por
   el proyecto.
 
 > **Por qué el script no usa `wandb.login(key=...)` (error corregido)**: esa
@@ -330,7 +330,7 @@ entrenamientos — Nano y Small, cada uno con Base y Augmented:
 # Nano — dataset base
 python train_yolo12.py `
     --data data\visdrone_base.yaml `
-    --name visdrone_base_n `
+    --name nano_base `
     --model yolo12n.pt `
     --epochs 250 `
     --imgsz 640 `
@@ -340,7 +340,7 @@ python train_yolo12.py `
 # Nano — dataset aumentado (offline)
 python train_yolo12.py `
     --data data\visdrone_augmented.yaml `
-    --name visdrone_augmented_n `
+    --name nano_augmented `
     --model yolo12n.pt `
     --epochs 250 `
     --imgsz 640 `
@@ -350,7 +350,7 @@ python train_yolo12.py `
 # Small — dataset base
 python train_yolo12.py `
     --data data\visdrone_base.yaml `
-    --name visdrone_base_s `
+    --name small_base `
     --model yolo12s.pt `
     --epochs 250 `
     --imgsz 640 `
@@ -360,7 +360,7 @@ python train_yolo12.py `
 # Small — dataset aumentado (offline)
 python train_yolo12.py `
     --data data\visdrone_augmented.yaml `
-    --name visdrone_augmented_s `
+    --name small_augmented `
     --model yolo12s.pt `
     --epochs 250 `
     --imgsz 640 `
@@ -376,8 +376,8 @@ python train_yolo12.py `
 > nombres únicos igual, para que el dashboard quede ordenado.
 
 Los resultados locales quedan en subcarpetas independientes dentro del mismo
-proyecto: `runs/YOLOv12/visdrone_base_n/`, `runs/YOLOv12/visdrone_augmented_n/`,
-`runs/YOLOv12/visdrone_base_s/` y `runs/YOLOv12/visdrone_augmented_s/`. En
+proyecto: `runs/YOLOv12/nano_base/`, `runs/YOLOv12/nano_augmented/`,
+`runs/YOLOv12/small_base/` y `runs/YOLOv12/small_augmented/`. En
 W&B, las cuatro corridas caen en el mismo proyecto (`YOLOv12`), distinguidas
 por nombre de corrida.
 
@@ -441,7 +441,7 @@ código, solo estos comandos de referencia:
 # Medium — dataset base
 python train_yolo12.py `
     --data data\visdrone_base.yaml `
-    --name visdrone_base_m `
+    --name medium_base `
     --model yolo12m.pt `
     --epochs 250 `
     --imgsz 640 `
@@ -451,7 +451,7 @@ python train_yolo12.py `
 # Medium — dataset aumentado (offline)
 python train_yolo12.py `
     --data data\visdrone_augmented.yaml `
-    --name visdrone_augmented_m `
+    --name medium_augmented `
     --model yolo12m.pt `
     --epochs 250 `
     --imgsz 640 `
