@@ -23,14 +23,14 @@ Sigue este orden para reproducir el experimento sin errores:
    para este flujo en Windows.
 2. **Configuración de parámetros**: apunta `data/visdrone_base.yaml` y
    `data/visdrone_augmented.yaml` (sección 5) a tu dataset real, y copia
-   `.env.example` a `.env` (sección 7) con tu `WANDB_API_KEY`/`WANDB_PROJECT`
+   `.env.example` a `.env` (sección 8) con tu `WANDB_API_KEY`/`WANDB_PROJECT`
    reales. No toques los hiperparámetros de red (sección 6) — quedan
    idénticos en las cuatro corridas.
 3. **Ejecución**: corre `train_yolo12.py` con los comandos de PowerShell de
-   la sección 8 — cuatro corridas: Nano y Small, cada uno con Base y
+   la sección 9 — cuatro corridas: Nano y Small, cada uno con Base y
    Augmented.
 4. **Resolución de problemas**: si algo falla o los resultados difieren de
-   lo esperado, revisa la sección 11 al final de este documento — reúne los
+   lo esperado, revisa la sección 12 al final de este documento — reúne los
    problemas encontrados y resueltos durante estas pruebas (build de
    `stringzilla`, autenticación de W&B, OOM en `TaskAlignedAssigner`,
    entrenamiento lento).
@@ -281,9 +281,59 @@ hiperparámetros.
 
 Solo se controlan parámetros de **ejecución/hardware** (no de red):
 `epochs`, `imgsz`, `batch`, `workers`, `amp`, `device`, `patience` — ver
-sección 8.
+sección 9.
 
-## 7. Credenciales W&B (seguras, sin hardcodear)
+## 7. Metodología de entrenamiento
+
+- **Estrategia**: transfer learning con fine-tuning completo desde pesos
+  preentrenados en COCO, no entrenamiento desde cero. `YOLO(args.model)`
+  carga directamente `yolo12n.pt`/`yolo12s.pt` (checkpoints publicados por
+  `ultralytics/assets`, entrenados en COCO). El log de cada corrida
+  confirma la transferencia de pesos — por ejemplo, con `yolo12l.pt`:
+  `Transferred 1031/1341 items from pretrained weights` (mismo mecanismo de
+  carga para Nano/Small). El head de detección se reconstruye para `nc=1`
+  (`Overriding model.yaml nc=80 with nc=1` en el log) — las 80 clases de
+  COCO se reducen a la única clase `person`; el resto de los pesos
+  preentrenados se conserva como punto de partida y se ajusta durante el
+  entrenamiento.
+
+- **Tratamiento de capas**: `train_yolo12.py` no pasa `freeze=`, así que
+  ultralytics usa `freeze=None` → ninguna capa del backbone, neck o head
+  queda congelada por configuración; todos los parámetros se ajustan desde
+  la época 1, sin fases de descongelamiento progresivo. El único
+  congelamiento presente en el log (`Freezing layer
+  'model.21.dfl.conv.weight'`) es automático e independiente del script:
+  ultralytics congela siempre el módulo `.dfl` (distribution focal loss) en
+  cualquier entrenamiento, porque es una proyección fija por diseño de la
+  arquitectura, no una capa entrenable.
+
+- **Optimizador y scheduler** (hiperparámetros clave, ver también sección
+  6.1):
+  - `optimizer: auto` resuelve a **SGD** en esta configuración: con `nc=1`,
+    `epochs=250`, `batch=16` (`nbs=64`), ultralytics calcula
+    `iterations = ceil(8081 / 64) * 250 = 31.750`, muy por encima del
+    umbral de `10.000` que decide entre SGD y AdamW. El optimizador
+    resultante es `SGD(lr=0.01, momentum=0.9)` — el momentum efectivo
+    (`0.9`) difiere del `momentum: 0.937` configurado en `default.yaml`
+    (sección 6.1), porque la rama `optimizer=auto` para SGD fija
+    `lr=0.01`/`momentum=0.9` e ignora explícitamente el momentum
+    configurado (el log lo confirma: `ignoring 'lr0=0.01' and
+    'momentum=0.937' [...] determining best [...] automatically`).
+  - `accumulate = round(nbs / batch) = round(64/16) = 4`: acumula gradiente
+    de 4 batches antes de cada paso de optimización, para aproximar un
+    batch nominal de 64 aunque `--batch` sea 16. `weight_decay` se escala
+    por `batch * accumulate / nbs = 16*4/64 = 1`, así que queda igual a
+    `0.0005` con esta combinación de `batch`/`nbs`.
+  - **Scheduler**: `cos_lr: False` (sección 6.1) usa decaimiento **lineal**,
+    no coseno — `lr(epoch) = lr0 * (max(1 - epoch/epochs, 0) * (1 - lrf) +
+    lrf)` — de `lr0=0.01` en la época 0 a `lr0 * lrf = 0.0001` en la época
+    250.
+  - **Warmup**: `warmup_epochs: 3.0` — las primeras 3 épocas interpolan el
+    momentum desde `warmup_momentum: 0.8` hasta el momentum del optimizador
+    (`0.9`) y el bias learning rate desde `warmup_bias_lr: 0.0`, antes de
+    aplicar el scheduler normal.
+
+## 8. Credenciales W&B (seguras, sin hardcodear)
 
 - `.env.example` (versionado en git, sin secretos reales) documenta las
   variables requeridas.
@@ -321,7 +371,7 @@ sección 8.
 > activo (`wb.run`) y solo loguea métricas en él, sin volver a llamar a
 > `wb.init()`.
 
-## 8. Ejecutar los entrenamientos (PowerShell)
+## 9. Ejecutar los entrenamientos (PowerShell)
 
 Con el entorno `yolov12` (sección 3) activado, ejecuta los cuatro
 entrenamientos — Nano y Small, cada uno con Base y Augmented:
@@ -464,7 +514,7 @@ python train_yolo12.py `
 > recomienda reintentarlo sin bajar `--batch` agresivamente o usar
 > `--batch -1` (autobatch).
 
-## 9. Métricas registradas en W&B
+## 10. Métricas registradas en W&B
 
 La integración nativa de ultralytics (`ultralytics/utils/callbacks/wb.py`,
 activada vía `settings.update({"wandb": True})`) ya registra
@@ -493,7 +543,7 @@ registra las mismas métricas con nombres explícitos bajo el prefijo
   accuracy de clasificación estándar cuando no hay negativos verdaderos
   explícitos por imagen)
 
-## 10. Verificación de GPU (incluida en el script)
+## 11. Verificación de GPU (incluida en el script)
 
 Antes de cada entrenamiento, `train_yolo12.py` imprime y valida:
 
@@ -507,7 +557,7 @@ torch.cuda.get_device_capability(0)
 Si `torch.cuda.is_available()` es `False`, el script aborta antes de cargar
 el dataset o inicializar W&B.
 
-## 11. Resolución de problemas
+## 12. Resolución de problemas
 
 Problemas reales encontrados y resueltos durante estas pruebas, en el orden
 en que suelen aparecer. Cada fila tiene la explicación completa en la
@@ -516,8 +566,8 @@ sección indicada.
 | Síntoma | Causa | Fix | Detalle |
 |---|---|---|---|
 | `pip install -r requirements-windows.txt` falla con `Building wheel for stringzilla ... Microsoft Visual C++ 14.0 or greater is required` | `albumentations` arrastra `albucore`→`stringzilla>=3.10.4`, que no publica wheel para Windows desde su serie 2.x | Instalar *Build Tools for Visual Studio* y marcar explícitamente el workload **"Desktop development with C++"** (el instalador base solo, sin ese workload, no basta) | sección 2 |
-| `ValueError: API key must be 40 characters long, yours was 86` al iniciar el entrenamiento | `wandb.login(key=...)` valida el formato clásico de key personal (40 caracteres); las keys con prefijo (`wandb_v1_...`, de cuentas de servicio/organización) no lo cumplen aunque sean válidas | El script ya no llama a `wandb.login()`; exporta `WANDB_API_KEY` como variable de entorno y deja que `wandb.init()` autentique contra el backend real | sección 7 |
-| `wandb.errors.UsageError: Invalid project name '...': cannot contain characters '/,\,#,?,%,:'` | El callback nativo de ultralytics derivaba el nombre de proyecto de W&B a partir de una ruta local de Windows (con `\` y `:`) | El script llama a `wandb.init(project=..., name=...)` con el nombre de proyecto limpio antes de `model.train()` | sección 7 |
-| GPU casi al 100% de uso pero el entrenamiento no avanza (época 1 pegada) | `WARNING: CUDA OutOfMemoryError in TaskAlignedAssigner, using CPU` — `batch`/`imgsz` demasiado altos para la VRAM disponible con este dataset (VisDrone tiene muchísimas cajas por imagen) | Bajar `--batch` y/o `--imgsz`, o usar `--batch -1` (autobatch); también se cambió el modelo de `yolo12l.pt` a `yolo12m.pt` | sección 8 (nota de imgsz/batch), historial de commits |
-| Entrenamiento lento pero **sin** ese warning de OOM | Normal a mayor resolución con YOLOv12: los bloques de atención (`A2C2f`) escalan peor que una CNN, y sin FlashAttention (`"Using scaled_dot_product_attention instead"`, esperado en Windows) el fallback es más lento — más notorio en una GPU Blackwell reciente con kernels aún inmaduros | Revisar el `s/it`/`ETA` de la barra de progreso antes de asumir un cuelgue; bajar `imgsz` o subir `--workers` si el cuello de botella es el preprocesamiento en CPU | sección 8 |
+| `ValueError: API key must be 40 characters long, yours was 86` al iniciar el entrenamiento | `wandb.login(key=...)` valida el formato clásico de key personal (40 caracteres); las keys con prefijo (`wandb_v1_...`, de cuentas de servicio/organización) no lo cumplen aunque sean válidas | El script ya no llama a `wandb.login()`; exporta `WANDB_API_KEY` como variable de entorno y deja que `wandb.init()` autentique contra el backend real | sección 8 |
+| `wandb.errors.UsageError: Invalid project name '...': cannot contain characters '/,\,#,?,%,:'` | El callback nativo de ultralytics derivaba el nombre de proyecto de W&B a partir de una ruta local de Windows (con `\` y `:`) | El script llama a `wandb.init(project=..., name=...)` con el nombre de proyecto limpio antes de `model.train()` | sección 8 |
+| GPU casi al 100% de uso pero el entrenamiento no avanza (época 1 pegada) | `WARNING: CUDA OutOfMemoryError in TaskAlignedAssigner, using CPU` — `batch`/`imgsz` demasiado altos para la VRAM disponible con este dataset (VisDrone tiene muchísimas cajas por imagen) | Bajar `--batch` y/o `--imgsz`, o usar `--batch -1` (autobatch); también se cambió el modelo de `yolo12l.pt` a `yolo12m.pt` | sección 9 (nota de imgsz/batch), historial de commits |
+| Entrenamiento lento pero **sin** ese warning de OOM | Normal a mayor resolución con YOLOv12: los bloques de atención (`A2C2f`) escalan peor que una CNN, y sin FlashAttention (`"Using scaled_dot_product_attention instead"`, esperado en Windows) el fallback es más lento — más notorio en una GPU Blackwell reciente con kernels aún inmaduros | Revisar el `s/it`/`ETA` de la barra de progreso antes de asumir un cuelgue; bajar `imgsz` o subir `--workers` si el cuello de botella es el preprocesamiento en CPU | sección 9 |
 | `torch.cuda.is_available()` da `True` pero el entrenamiento falla o cae a CPU sin avisar | El wheel de PyTorch instalado (`cu124`) no incluye kernels para Blackwell (`sm_120`, RTX 50-series) | Reinstalar con `--index-url https://download.pytorch.org/whl/cu128` | sección 1, sección 4 |
