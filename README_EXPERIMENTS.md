@@ -24,8 +24,8 @@ Sigue este orden para reproducir el experimento sin errores:
 2. **Configuración de parámetros**: apunta `data/visdrone_base.yaml` y
    `data/visdrone_augmented.yaml` (sección 5) a tu dataset real, y copia
    `.env.example` a `.env` (sección 7) con tu `WANDB_API_KEY`/`WANDB_PROJECT` reales.
-   No toques los hiperparámetros de red (sección 6) — deben quedar idénticos entre
-   Experimento 1 y 2.
+   No toques los hiperparámetros de red (sección 6) — deben quedar idénticos
+   en las cuatro corridas.
 3. **Ejecución**: corre `train_yolo12.py` con los comandos de PowerShell de
    la sección 8 — cuatro corridas: Nano y Small, cada uno con Base y
    Augmented.
@@ -128,7 +128,7 @@ Para eliminarlo por completo (p. ej. para reinstalar desde cero):
 
 ## 4. Instalación manual en Windows (ningún script automático)
 
-Ejecutar en PowerShell, con el entorno `yolov12` del sección 3 ya activado:
+Ejecutar en PowerShell, con el entorno `yolov12` de la sección 3 ya activado:
 
 ```powershell
 # 1) Actualizar pip
@@ -156,10 +156,27 @@ pip install -e .
 
 ## 5. Estructura de directorios esperada
 
-Ultralytics resuelve el campo `path` de cada `.yaml` de dataset como
-`(datasets_dir / path).resolve()`, donde `datasets_dir` es la carpeta
-configurada en `ultralytics/settings.json` (por defecto, la carpeta hermana
-`datasets/` junto al repo clonado). Estructura esperada:
+`data/visdrone_base.yaml` (dataset base) usa una ruta **absoluta** en
+`path:`, así que ultralytics la usa tal cual, sin pasar por `datasets_dir`.
+Apunta al dataset real, confirmado en disco:
+
+```
+C:\Users\pedroam\Documents\Data-Augmentation\Datasets-Clean\VisDrone\
+├── train\
+│   ├── images\        (8081 imágenes)
+│   └── labels\         (8081 .txt, YOLO: class x_center y_center w h, normalizado 0-1)
+└── validation\
+    ├── images\        (532 imágenes)
+    └── labels\         (532 .txt)
+```
+
+`data/visdrone_augmented.yaml` (dataset aumentado) **todavía usa una ruta
+relativa placeholder** (`../datasets/VisDrone_Augmented`, resuelta por
+ultralytics como `(datasets_dir / path).resolve()`, donde `datasets_dir` es
+la carpeta configurada en `ultralytics/settings.json` — por defecto, la
+carpeta hermana `datasets/` junto al repo clonado). Actualízala del mismo
+modo que `visdrone_base.yaml` (path absoluto) cuando tengas lista la copia
+con el pipeline de aumento offline aplicado:
 
 ```
 GitHub/
@@ -170,30 +187,31 @@ GitHub/
 │   ├── README_EXPERIMENTS.md         (este archivo)
 │   ├── .env / .env.example
 │   ├── data/
-│   │   ├── visdrone_base.yaml
-│   │   └── visdrone_augmented.yaml
+│   │   ├── visdrone_base.yaml        (path absoluto, ver arriba)
+│   │   └── visdrone_augmented.yaml   (pendiente de ruta real)
 │   └── runs/                         ← resultados (gitignored)
-│       └── YOLOv12/                  ← un solo proyecto W&B; Base/Augmented se distinguen por --name
-│           ├── visdrone_base/
-│           └── visdrone_augmented/
-└── datasets/                         ← gitignored, poblado por ti
-    ├── VisDrone_Base/
-    │   ├── images/{train,val}/*.jpg
-    │   └── labels/{train,val}/*.txt  (YOLO: class x_center y_center w h, normalizado 0-1)
+│       └── YOLOv12/                  ← un solo proyecto W&B; modelo/dataset se distinguen por --name
+│           ├── visdrone_base_n/
+│           ├── visdrone_augmented_n/
+│           ├── visdrone_base_s/
+│           └── visdrone_augmented_s/
+└── datasets/                         ← gitignored; solo necesario para el dataset aumentado
     └── VisDrone_Augmented/
         ├── images/{train,val}/*.jpg  ← salida de tu pipeline de aumento offline
         └── labels/{train,val}/*.txt
 ```
 
 - **Clases**: `nc: 1`, `names: ['person']` (índice `0`) en ambos `.yaml`.
-- **Experimento 1** (`visdrone_base.yaml`) usa `datasets/VisDrone_Base` (dataset
-  convertido a formato YOLO, sin preprocesamiento adicional).
-- **Experimento 2** (`visdrone_augmented.yaml`) usa `datasets/VisDrone_Augmented`
-  (mismas imágenes de origen, pasadas por tu pipeline de aumento de datos
-  *offline*, previo al entrenamiento). Los aumentos *on-the-fly* de YOLO
-  (mosaic, mixup, fliplr, hsv, etc.) se aplican igual en ambos casos vía los
-  valores por defecto de `ultralytics/cfg/default.yaml` — la única variable
-  entre los dos experimentos es el contenido físico de imágenes/etiquetas.
+  Verificado en el dataset real: las etiquetas solo usan el índice `0`.
+- **Dataset base** (`visdrone_base.yaml`) apunta al dataset de arriba, sin
+  preprocesamiento adicional.
+- **Dataset aumentado** (`visdrone_augmented.yaml`) debe apuntar a una copia
+  de las mismas imágenes, pasadas por tu pipeline de aumento de datos
+  *offline*, previo al entrenamiento. Los aumentos *on-the-fly* de YOLO
+  (mosaic, mixup, fliplr, hsv, etc. — sección 6) se aplican igual en ambos
+  casos, con los mismos valores por defecto de `ultralytics/cfg/default.yaml`
+  en las cuatro corridas — la única variable entre dataset base y aumentado
+  es el contenido físico de imágenes/etiquetas.
 
 ## 6. Hiperparámetros (idénticos en las cuatro corridas)
 
@@ -268,10 +286,11 @@ Solo se controlan parámetros de **ejecución/hardware** (no de red): `epochs`,
 - `.env` (NO versionado, ver `.gitignore`) contiene tu `WANDB_API_KEY` real.
 - `train_yolo12.py` carga `.env` con `python-dotenv`; si `WANDB_API_KEY` falta,
   el script aborta con un mensaje claro en vez de entrenar sin tracking.
-- Ambos experimentos reportan al **mismo proyecto W&B** (`${WANDB_PROJECT}`,
-  p. ej. `YOLOv12`); Base vs. Augmented se distingue por el **nombre de la
-  corrida** (`--name visdrone_base` / `--name visdrone_augmented`), no por el
-  proyecto.
+- Las cuatro corridas reportan al **mismo proyecto W&B** (`${WANDB_PROJECT}`,
+  p. ej. `YOLOv12`); modelo (Nano/Small) y dataset (Base/Augmented) se
+  distinguen por el **nombre de la corrida** (`--name visdrone_base_n`,
+  `visdrone_augmented_n`, `visdrone_base_s`, `visdrone_augmented_s`), no por
+  el proyecto.
 
 > **Por qué no se usa `wandb.login(key=...)` (error corregido)**: esa función
 > escribe la key en `~/.netrc` y valida que tenga exactamente 40 caracteres —
@@ -371,15 +390,13 @@ por nombre de corrida.
 > recortarse o deformarse. **Confirmado en este dataset a `imgsz=1280` con
 > `yolo12l.pt` (Large)**: `batch=8` produce `CUDA OutOfMemoryError` en
 > `TaskAlignedAssigner` (VisDrone tiene muchísimas cajas por imagen, lo que
-> infla el tensor de costo de asignación) — uno de los motivos por los que se
-> pasó primero a `yolo12m.pt` (Medium) y después se redujo el alcance del
-> proyecto a Nano y Small únicamente, ambos bastante más livianos. A `640px`
-> hay mucho más margen de VRAM (~6.25× menos píxeles que a 1280px) y estos
+> infla el tensor de costo de asignación) — el motivo original del recorte de
+> alcance a Nano/Small (ver nota al inicio del documento). A `640px` hay
+> mucho más margen de VRAM (~6.25× menos píxeles que a 1280px) y estos
 > modelos son mucho más chicos que Large, así que `--batch` sube a `16` — no
-> verificado todavía en este dataset con Nano/Small (debería sobrar VRAM,
-> dado que ni Medium llegó a probarse a fondo a esta resolución); si da
-> `OOM`, baja o usa `--batch -1` (autobatch, deja que ultralytics mida la
-> VRAM libre real) — solo usa el **mismo** valor en las cuatro corridas.
+> verificado todavía con Nano/Small en este dataset; si da `OOM`, baja o usa
+> `--batch -1` (autobatch, deja que ultralytics mida la VRAM libre real) —
+> solo usa el **mismo** valor en las cuatro corridas.
 
 > **"El entrenamiento es muy lento / no avanza" (causa raíz confirmada)**: si
 > ves `WARNING: CUDA OutOfMemoryError in TaskAlignedAssigner, using CPU` justo
