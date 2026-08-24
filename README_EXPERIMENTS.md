@@ -263,9 +263,20 @@ por categoría:
 | `bgr` | `0.0` |
 | `mosaic` | `1.0` |
 | `mixup` | `0.0` |
-| `copy_paste` | `0.1` |
+| `copy_paste` | `0.1` (configurado, pero **inerte** en este proyecto — ver nota abajo) |
 | `copy_paste_mode` | `flip` |
 | `close_mosaic` | `10` (últimas 10 épocas sin mosaic) |
+
+> **`copy_paste` no tiene efecto real en estos experimentos**: en
+> `ultralytics/data/augment.py:1676`, la clase `CopyPaste` hace
+> `if len(labels["instances"].segments) == 0 or self.p == 0: return labels`
+> — es un no-op si las labels no tienen `segments` (máscaras de
+> segmentación). El dataset VisDrone de este proyecto son solo bounding
+> boxes (formato YOLO `class x_center y_center w h`, sin polígonos), así
+> que `segments` siempre tiene longitud 0 y `copy_paste` nunca se ejecuta,
+> sin importar el valor `0.1` configurado. A diferencia de `mixup: 0.0` o
+> `shear: 0.0` (apagados por valor), acá el valor sugiere que está
+> "encendido" pero es inerte por incompatibilidad de formato de datos.
 
 ### 6.4 Aumento adicional vía Albumentations (fijo en código, no en `default.yaml`)
 
@@ -273,9 +284,22 @@ Además de lo anterior, ultralytics aplica siempre esta transformación
 `albumentations` — visible en el log de cada corrida
 (`albumentations: Blur(p=0.01, ...), MedianBlur(p=0.01, ...), ToGray(p=0.01,
 ...), CLAHE(p=0.01, ...)`) — con probabilidades **hardcodeadas** en
-`ultralytics/data/augment.py`, no configurables vía `default.yaml` ni CLI:
-`Blur`, `MedianBlur`, `ToGray` y `CLAHE`, cada una con `p=0.01`. Es idéntica
-en las cuatro corridas por ser parte fija del código, no de los
+`ultralytics/data/augment.py:1847-1853`, no configurables vía
+`default.yaml` ni CLI. La composición completa tiene 7 transforms, 4 con
+probabilidad activa y 3 en `p=0.0` (presentes en el código pero sin efecto
+observable):
+
+| Transform | Probabilidad |
+|---|---|
+| `Blur` | `0.01` |
+| `MedianBlur` | `0.01` |
+| `ToGray` | `0.01` |
+| `CLAHE` | `0.01` |
+| `RandomBrightnessContrast` | `0.0` (sin efecto) |
+| `RandomGamma` | `0.0` (sin efecto) |
+| `ImageCompression` | `0.0` (sin efecto) |
+
+Es idéntica en las cuatro corridas por ser parte fija del código, no de los
 hiperparámetros.
 
 > **No aplican a estos experimentos**: `auto_augment`, `erasing` y
@@ -338,13 +362,13 @@ sección 9.
   | `optimizer` | `auto` | `build_optimizer` (`ultralytics/engine/trainer.py:759-788`): con `nc=1`, `epochs=250`, `batch=16` (`nbs=64`), `iterations = ceil(8081/64) * 250 = 31.750`, muy por encima del umbral de `10.000` que decide entre SGD y AdamW — resuelve a **`SGD(lr=0.01, momentum=0.9)`** |
   | `lr0` | `0.01` | Coincide con el `lr` real solo porque la rama SGD de `optimizer: auto` también hardcodea `lr=0.01` — no es un traspaso directo del valor de `default.yaml` |
   | `lrf` | `0.01` | Fracción final: la LR decae hasta `lr0 × lrf = 0.0001` al terminar las 250 épocas |
-  | `momentum` | `0.937` | **Se ignora**: la rama SGD de `optimizer: auto` hardcodea `momentum=0.9`, no `0.937` — confirmado en el log: `ignoring 'lr0=0.01' and 'momentum=0.937' [...] determining best [...] automatically` |
+  | `momentum` | `0.937` | **Se ignora al construir el optimizador**: la rama SGD de `optimizer: auto` hardcodea `momentum=0.9` en una variable local (`trainer.py:787`), sin reescribir `self.args.momentum` — confirmado en el log: `ignoring 'lr0=0.01' and 'momentum=0.937' [...] determining best [...] automatically`. El `SGD(lr=0.01, momentum=0.9)` que se imprime al arrancar es solo el valor de construcción — ver la fila `warmup_momentum` para el valor que termina quedando vigente |
   | `cos_lr` | `False` | Scheduler **lineal** (`_setup_scheduler`, `ultralytics/engine/trainer.py:209-215`), no coseno: `lr(epoch) = lr0 × (max(1 − epoch/epochs, 0) × (1 − lrf) + lrf)` |
   | `warmup_epochs` | `3.0` | Sin cambios — las primeras 3 épocas interpolan LR y momentum en vez de arrancar de golpe |
-  | `warmup_momentum` | `0.8` | Sin cambios — interpola hacia el momentum real del optimizador (`0.9`, no el `0.937` de `default.yaml`) |
+  | `warmup_momentum` | `0.8` | **El momentum termina en `0.937`, no en `0.9`.** `trainer.py:376` hace `x["momentum"] = np.interp(ni, xi, [self.args.warmup_momentum, self.args.momentum])`, escribiendo directamente sobre `self.optimizer.param_groups` — y `self.args.momentum` sigue en `0.937` (nunca se reescribió, ver fila `momentum`). Como `self.args.momentum` es el valor objetivo de esa interpolación, el warmup lleva el momentum real del optimizador de `0.8` a `0.937` a lo largo de las 3 épocas, no a `0.9`. Ningún otro punto del código vuelve a tocar `param_groups[...]["momentum"]`, así que `0.937` queda fijo el resto de las 250 épocas — el `momentum=0.9` del log solo es cierto en el instante de construcción, antes de que arranque el warmup |
   | `warmup_bias_lr` | `0.0` | `build_optimizer` fija explícitamente `self.args.warmup_bias_lr = 0.0` en la rama `auto` (`ultralytics/engine/trainer.py:788`) — coincide con el default de `default.yaml` en este caso, así que no hay cambio observable |
 
-  Además, `accumulate = round(nbs / batch) = round(64/16) = 4`
+  Además, `accumulate = max(round(nbs / batch), 1) = max(round(64/16), 1) = 4`
   (`ultralytics/engine/trainer.py:301`): acumula gradiente de 4 batches
   antes de cada paso de optimización, para aproximar un batch nominal de 64
   aunque `--batch` sea 16. `weight_decay` se escala por
