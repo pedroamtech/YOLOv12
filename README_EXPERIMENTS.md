@@ -195,11 +195,13 @@ GitHub/
   valores por defecto de `ultralytics/cfg/default.yaml` — la única variable
   entre los dos experimentos es el contenido físico de imágenes/etiquetas.
 
-## 6. Hiperparámetros (idénticos en ambos experimentos)
+## 6. Hiperparámetros (idénticos en las cuatro corridas)
 
-`train_yolo12.py` **no** pasa overrides de `lr0`, `optimizer`, `mosaic`,
-`mixup`, `fliplr`, `hsv_*`, `degrees`, etc. — todos se heredan sin modificar
-de `ultralytics/cfg/default.yaml`, entre ellos:
+`train_yolo12.py` **no** pasa overrides de ningún hiperparámetro de red —
+todos se heredan sin modificar de `ultralytics/cfg/default.yaml`. Agrupados
+por categoría:
+
+### 6.1 Optimización / entrenamiento
 
 | Parámetro | Valor por defecto |
 |---|---|
@@ -207,11 +209,54 @@ de `ultralytics/cfg/default.yaml`, entre ellos:
 | `lr0` / `lrf` | `0.01` / `0.01` |
 | `momentum` | `0.937` |
 | `weight_decay` | `0.0005` |
+| `warmup_epochs` | `3.0` |
+| `warmup_momentum` | `0.8` |
+| `warmup_bias_lr` | `0.0` |
+| `cos_lr` | `False` (decay lineal, no coseno) |
+
+### 6.2 Función de pérdida
+
+| Parámetro | Valor por defecto |
+|---|---|
+| `box` | `7.5` (peso de la pérdida de caja) |
+| `cls` | `0.5` (peso de la pérdida de clase) |
+| `dfl` | `1.5` (peso de distribution focal loss) |
+
+### 6.3 Aumento de datos clásico (on-the-fly, activo en detección)
+
+| Parámetro | Valor por defecto |
+|---|---|
+| `hsv_h` / `hsv_s` / `hsv_v` | `0.015` / `0.7` / `0.4` |
+| `degrees` | `0.0` (rotación) |
+| `translate` | `0.1` |
+| `scale` | `0.5` |
+| `shear` | `0.0` |
+| `perspective` | `0.0` |
+| `flipud` | `0.0` (flip vertical) |
+| `fliplr` | `0.5` (flip horizontal) |
+| `bgr` | `0.0` |
 | `mosaic` | `1.0` |
 | `mixup` | `0.0` |
-| `fliplr` | `0.5` |
-| `hsv_h/s/v` | `0.015 / 0.7 / 0.4` |
+| `copy_paste` | `0.1` |
+| `copy_paste_mode` | `flip` |
 | `close_mosaic` | `10` (últimas 10 épocas sin mosaic) |
+
+### 6.4 Aumento adicional vía Albumentations (fijo en código, no en `default.yaml`)
+
+Además de lo anterior, ultralytics aplica siempre esta transformación
+`albumentations` — visible en el log de cada corrida
+(`albumentations: Blur(p=0.01, ...), MedianBlur(p=0.01, ...), ToGray(p=0.01,
+...), CLAHE(p=0.01, ...)`) — con probabilidades **hardcodeadas** en
+`ultralytics/data/augment.py`, no configurables vía `default.yaml` ni CLI:
+`Blur`, `MedianBlur`, `ToGray` y `CLAHE`, cada una con `p=0.01`. Es idéntica
+en las cuatro corridas por ser parte fija del código, no de los
+hiperparámetros.
+
+> **No aplican a estos experimentos**: `auto_augment`, `erasing` y
+> `crop_fraction` también existen en `default.yaml` y aparecen en el log de
+> `args` de cada corrida, pero según su propia documentación en el archivo
+> son específicos de **clasificación** (`ultralytics/data/dataset.py`) — no
+> afectan el pipeline de aumento de detección que usan estos experimentos.
 
 Solo se controlan parámetros de **ejecución/hardware** (no de red): `epochs`,
 `imgsz`, `batch`, `workers`, `amp`, `device`, `patience` — ver sección 8.
