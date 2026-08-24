@@ -235,6 +235,11 @@ por categoría:
 | `warmup_bias_lr` | `0.0` |
 | `cos_lr` | `False` (decay lineal, no coseno) |
 
+> Estos son los valores tal cual están en `ultralytics/cfg/default.yaml` —
+> con `optimizer: auto`, varios se recalculan o se sobreescriben en tiempo
+> de ejecución (`optimizer`, `momentum` efectivo). El detalle completo, con
+> líneas de código exactas, está en la sección 7.
+
 ### 6.2 Función de pérdida
 
 | Parámetro | Valor por defecto |
@@ -283,55 +288,73 @@ Solo se controlan parámetros de **ejecución/hardware** (no de red):
 `epochs`, `imgsz`, `batch`, `workers`, `amp`, `device`, `patience` — ver
 sección 9.
 
-## 7. Metodología de entrenamiento
+## 7. Metodología de entrenamiento (transfer learning / fine-tuning)
 
-- **Estrategia**: transfer learning con fine-tuning completo desde pesos
-  preentrenados en COCO, no entrenamiento desde cero. `YOLO(args.model)`
-  carga directamente `yolo12n.pt`/`yolo12s.pt` (checkpoints publicados por
-  `ultralytics/assets`, entrenados en COCO). El log de cada corrida
-  confirma la transferencia de pesos — por ejemplo, con `yolo12l.pt`:
-  `Transferred 1031/1341 items from pretrained weights` (mismo mecanismo de
-  carga para Nano/Small). El head de detección se reconstruye para `nc=1`
-  (`Overriding model.yaml nc=80 with nc=1` en el log) — las 80 clases de
-  COCO se reducen a la única clase `person`; el resto de los pesos
-  preentrenados se conserva como punto de partida y se ajusta durante el
-  entrenamiento.
+- **Transfer learning + fine-tuning desde pesos preentrenados en COCO, no
+  entrenamiento desde cero.** `train_yolo12.py` siempre instancia
+  `YOLO(args.model)` con un checkpoint `.pt` (`yolo12n.pt`/`yolo12s.pt`),
+  nunca con un `.yaml` de arquitectura sin entrenar. En
+  `ultralytics/engine/trainer.py:578-580` (`BaseTrainer.setup_model`):
+  cuando `self.model` termina en `.pt`, llama a `attempt_load_one_weight`
+  para cargar esos pesos como punto de partida — no hay inicialización
+  aleatoria. Como VisDrone tiene una sola clase (`person`) contra las 80 de
+  COCO, la cabeza de clasificación no calza 1:1 con el checkpoint — el log
+  de cada corrida muestra estas dos líneas, generadas por
+  `ultralytics/nn/tasks.py:315-317` y `ultralytics/nn/tasks.py:265-278`:
 
-- **Tratamiento de capas**: `train_yolo12.py` no pasa `freeze=`, así que
-  ultralytics usa `freeze=None` → ninguna capa del backbone, neck o head
-  queda congelada por configuración; todos los parámetros se ajustan desde
-  la época 1, sin fases de descongelamiento progresivo. El único
-  congelamiento presente en el log (`Freezing layer
-  'model.21.dfl.conv.weight'`) es automático e independiente del script:
-  ultralytics congela siempre el módulo `.dfl` (distribution focal loss) en
-  cualquier entrenamiento, porque es una proyección fija por diseño de la
-  arquitectura, no una capa entrenable.
+  ```
+  Overriding model.yaml nc=80 with nc=1
+  Transferred 1031/1341 items from pretrained weights
+  ```
 
-- **Optimizador y scheduler** (hiperparámetros clave, ver también sección
-  6.1):
-  - `optimizer: auto` resuelve a **SGD** en esta configuración: con `nc=1`,
-    `epochs=250`, `batch=16` (`nbs=64`), ultralytics calcula
-    `iterations = ceil(8081 / 64) * 250 = 31.750`, muy por encima del
-    umbral de `10.000` que decide entre SGD y AdamW. El optimizador
-    resultante es `SGD(lr=0.01, momentum=0.9)` — el momentum efectivo
-    (`0.9`) difiere del `momentum: 0.937` configurado en `default.yaml`
-    (sección 6.1), porque la rama `optimizer=auto` para SGD fija
-    `lr=0.01`/`momentum=0.9` e ignora explícitamente el momentum
-    configurado (el log lo confirma: `ignoring 'lr0=0.01' and
-    'momentum=0.937' [...] determining best [...] automatically`).
-  - `accumulate = round(nbs / batch) = round(64/16) = 4`: acumula gradiente
-    de 4 batches antes de cada paso de optimización, para aproximar un
-    batch nominal de 64 aunque `--batch` sea 16. `weight_decay` se escala
-    por `batch * accumulate / nbs = 16*4/64 = 1`, así que queda igual a
-    `0.0005` con esta combinación de `batch`/`nbs`.
-  - **Scheduler**: `cos_lr: False` (sección 6.1) usa decaimiento **lineal**,
-    no coseno — `lr(epoch) = lr0 * (max(1 - epoch/epochs, 0) * (1 - lrf) +
-    lrf)` — de `lr0=0.01` en la época 0 a `lr0 * lrf = 0.0001` en la época
-    250.
-  - **Warmup**: `warmup_epochs: 3.0` — las primeras 3 épocas interpolan el
-    momentum desde `warmup_momentum: 0.8` hasta el momentum del optimizador
-    (`0.9`) y el bias learning rate desde `warmup_bias_lr: 0.0`, antes de
-    aplicar el scheduler normal.
+  (el segundo número es de una corrida real con `yolo12l.pt` — varía según
+  Nano/Small; lo importante es que **no** dice 1341/1341: `nn/tasks.py:275`
+  hace `intersect_dicts(csd, self.state_dict())` antes de cargar los pesos,
+  así que cualquier tensor cuya forma no calce — los canales de
+  clasificación del head, dimensionados para 80 clases — se descarta, y el
+  resto del backbone y el neck sí se transfieren completos).
+
+- **Ninguna capa congelada por configuración — fine-tuning general desde la
+  época 1, con una excepción fija por diseño.** `train_yolo12.py` no pasa
+  `freeze=` a `model.train()`, así que se usa el default de ultralytics:
+  `freeze=None` → `freeze_list=[]` en `ultralytics/engine/trainer.py:238-244`
+  — no hay una fase inicial con backbone congelado ni un "unfreeze"
+  progresivo. Pero **un módulo queda siempre congelado sin importar
+  `freeze=`**: `ultralytics/engine/trainer.py:246-251` fija
+  `always_freeze_names = [".dfl"]` — la proyección de distribution focal
+  loss que convierte la distribución de probabilidad de cada borde de caja
+  en una coordenada, hardcodeada como no entrenable por diseño de la
+  arquitectura (visible en el log como `Freezing layer
+  'model.21.dfl.conv.weight'`). El resto de la red ajusta el 100% de sus
+  parámetros.
+
+- **Hiperparámetros clave del fine-tuning** (ya listados en la sección 6.1;
+  acá el detalle de dónde el valor *real* en tiempo de ejecución difiere
+  del que aparece en `default.yaml`, por el propio comportamiento de
+  `optimizer: auto`):
+
+  | Parámetro | Valor en `default.yaml` | Qué pasa realmente en tiempo de ejecución |
+  |---|---|---|
+  | `optimizer` | `auto` | `build_optimizer` (`ultralytics/engine/trainer.py:759-788`): con `nc=1`, `epochs=250`, `batch=16` (`nbs=64`), `iterations = ceil(8081/64) * 250 = 31.750`, muy por encima del umbral de `10.000` que decide entre SGD y AdamW — resuelve a **`SGD(lr=0.01, momentum=0.9)`** |
+  | `lr0` | `0.01` | Coincide con el `lr` real solo porque la rama SGD de `optimizer: auto` también hardcodea `lr=0.01` — no es un traspaso directo del valor de `default.yaml` |
+  | `lrf` | `0.01` | Fracción final: la LR decae hasta `lr0 × lrf = 0.0001` al terminar las 250 épocas |
+  | `momentum` | `0.937` | **Se ignora**: la rama SGD de `optimizer: auto` hardcodea `momentum=0.9`, no `0.937` — confirmado en el log: `ignoring 'lr0=0.01' and 'momentum=0.937' [...] determining best [...] automatically` |
+  | `cos_lr` | `False` | Scheduler **lineal** (`_setup_scheduler`, `ultralytics/engine/trainer.py:209-215`), no coseno: `lr(epoch) = lr0 × (max(1 − epoch/epochs, 0) × (1 − lrf) + lrf)` |
+  | `warmup_epochs` | `3.0` | Sin cambios — las primeras 3 épocas interpolan LR y momentum en vez de arrancar de golpe |
+  | `warmup_momentum` | `0.8` | Sin cambios — interpola hacia el momentum real del optimizador (`0.9`, no el `0.937` de `default.yaml`) |
+  | `warmup_bias_lr` | `0.0` | `build_optimizer` fija explícitamente `self.args.warmup_bias_lr = 0.0` en la rama `auto` (`ultralytics/engine/trainer.py:788`) — coincide con el default de `default.yaml` en este caso, así que no hay cambio observable |
+
+  Además, `accumulate = round(nbs / batch) = round(64/16) = 4`
+  (`ultralytics/engine/trainer.py:301`): acumula gradiente de 4 batches
+  antes de cada paso de optimización, para aproximar un batch nominal de 64
+  aunque `--batch` sea 16. `weight_decay` se escala por
+  `batch × accumulate / nbs = 16×4/64 = 1` (`trainer.py:302`), así que queda
+  igual a `0.0005` con esta combinación de `batch`/`nbs`.
+
+  Esta combinación (fine-tuning general con `.dfl` siempre congelado,
+  warmup de 3 épocas, decaimiento lineal, optimizador auto-resuelto a SGD)
+  es la misma en las cuatro corridas — Nano y Small parten de sus
+  respectivos checkpoints de COCO, no de una arquitectura sin entrenar.
 
 ## 8. Credenciales W&B (seguras, sin hardcodear)
 
