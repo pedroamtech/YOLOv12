@@ -7,7 +7,6 @@
 # 'path' es absoluta, así que ultralytics la usa tal cual (no se resuelve contra
 # datasets_dir). Ver README_EXPERIMENTS.md, sección "Estructura de directorios".
 
-#path: C:/Users/pedroam/Documents/Data-Augmentation/Datasets-Clean/VisDrone # raíz del dataset
 path: ../datasets/VisDrone # raíz del dataset (relativa a datasets_dir)
 train: train/images # imágenes de entrenamiento (relativas a 'path')
 val: val/images # imágenes de validación (relativas a 'path')
