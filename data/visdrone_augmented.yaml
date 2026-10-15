@@ -8,8 +8,8 @@
 # La única variable entre el dataset base y el aumentado es el contenido de las imágenes/etiquetas.
 
 path: ../datasets/VisDrone_Augmented # raíz del dataset (relativa a datasets_dir)
-train: images/train # imágenes de entrenamiento (relativas a 'path')
-val: images/val # imágenes de validación (relativas a 'path')
+train: train/images # imágenes de entrenamiento (relativas a 'path')
+val: val/images # imágenes de validación (relativas a 'path')
 test: # opcional
 
 # Classes
