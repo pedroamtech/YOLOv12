@@ -1,0 +1,19 @@
+# Ultralytics YOLO 🚀 - Dataset config: VisDrone (ORIGINAL + AUMENTADO offline)
+# Entrena con las imágenes originales de VisDrone MÁS sus versiones aumentadas offline
+# (Visdrone-Augmented, archivos <original>_aug_<id>.jpg). No se copian archivos: ultralytics
+# acepta una lista de carpetas en 'train' y busca cada label reemplazando /images/ por /labels/.
+#
+# La validación es la MISMA de visdrone_base.yaml (val idéntico en ambos datasets), así que
+# los resultados son comparables con base y augmented. Hiperparámetros sin cambios.
+
+path: C:/Users/pedroam/Documents/Data-Augmentation # raíz común de ambos datasets
+train:
+  - Datasets-Clean/VisDrone/train/images # 6890 originales
+  - Visdrone-Augmented/train/images # 6643 aumentadas (1 por original)
+val: Datasets-Clean/VisDrone/val/images # 1723 imágenes, igual que en base
+test: # opcional
+
+# Classes
+nc: 1
+names:
+  0: person
