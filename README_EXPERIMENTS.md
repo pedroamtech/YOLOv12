@@ -21,15 +21,18 @@ Sigue este orden para reproducir el experimento sin errores:
    las dependencias — **no** el `requirements.txt` original del repo, sino
    `requirements-windows.txt` (sección 4), el archivo independiente armado
    para este flujo en Windows.
-2. **Configuración de parámetros**: apunta `data/visdrone_base.yaml` y
-   `data/visdrone_augmented.yaml` (sección 5) a tu dataset real, y copia
-   `.env.example` a `.env` (sección 8) con tu `WANDB_API_KEY`/`WANDB_PROJECT`
-   reales. No toques los hiperparámetros de red (sección 6) — quedan
-   idénticos en las cuatro corridas.
+2. **Configuración de parámetros**: apunta `data/visdrone_base.yaml`,
+   `data/visdrone_augmented.yaml` y `data/visdrone_combined.yaml`
+   (sección 5) a tu dataset real, y copia `.env.example` a `.env`
+   (sección 8) con tu `WANDB_API_KEY`/`WANDB_PROJECT` reales. No toques los
+   hiperparámetros de red (sección 6) — quedan idénticos en todas las
+   corridas.
 3. **Ejecución**: corre `train_yolo12.py` con los comandos de PowerShell de
-   la sección 9 — cuatro corridas: Nano y Small, cada uno con Base y
-   Augmented.
-4. **Resolución de problemas**: si algo falla o los resultados difieren de
+   la sección 9 — seis corridas: Nano y Small, cada uno con Base, Augmented
+   y Combined (original + aumentado).
+4. **Resultados**: la comparación de las corridas ya terminadas y el motivo
+   del experimento Combined están en la sección 13.
+5. **Resolución de problemas**: si algo falla o los resultados difieren de
    lo esperado, revisa la sección 12 al final de este documento — reúne los
    problemas encontrados y resueltos durante estas pruebas (build de
    `stringzilla`, longitud de la API key de W&B, nombre de proyecto de W&B
@@ -182,13 +185,47 @@ C:\Users\pedroam\Documents\Data-Augmentation\Datasets-Clean\VisDrone\
 > de entrenamiento y 1723 de validación sobre un total de 8613 — exactamente
 > 80.00%/20.00%.
 
-`data/visdrone_augmented.yaml` (dataset aumentado) **todavía usa una ruta
-relativa placeholder** (`../datasets/VisDrone_Augmented`, resuelta por
-ultralytics como `(datasets_dir / path).resolve()`, donde `datasets_dir` es
-la carpeta configurada en `ultralytics/settings.json` — por defecto, la
-carpeta hermana `datasets/` junto al repo clonado). Actualízala del mismo
-modo que `visdrone_base.yaml` (path absoluto) en cuanto esté lista la copia
-con el pipeline de aumento offline aplicado:
+`data/visdrone_augmented.yaml` (dataset aumentado) también usa una ruta
+**absoluta** (la relativa anterior, `../datasets/VisDrone_Augmented`, quedó
+comentada en el archivo):
+
+```
+C:\Users\pedroam\Documents\Data-Augmentation\Visdrone-Augmented\
+├── train\
+│   ├── images\        (6643 imágenes, <original>_aug_<id>.jpg)
+│   └── labels\         (6643 .txt)
+└── val\
+    ├── images\        (1723 imágenes — idénticas a las del dataset base)
+    └── labels\         (1723 .txt — mismo hash que las del dataset base)
+```
+
+> **Importante — el dataset aumentado no contiene las originales.** Cada
+> imagen de `train` es una versión transformada (`<original>_aug_<id>`) de
+> una imagen de `train` del dataset base: una sola versión por original, 0
+> nombres en común con el base, y 247 originales sin versión aumentada
+> (6890 − 6643). Es decir, las corridas `*_augmented` entrenan con las
+> imágenes **sustituidas**, no añadidas. Verificado además que **ninguna**
+> aumentada proviene de `val` (sin fuga de validación) y que `val` es
+> idéntico en ambos datasets (mismos nombres y mismas etiquetas), así que
+> las métricas de validación son directamente comparables.
+
+`data/visdrone_combined.yaml` (dataset combinado, **experimento 3**) no
+crea ninguna carpeta nueva: ultralytics acepta una **lista** de carpetas en
+`train:` y busca cada label reemplazando `/images/` por `/labels/` en la
+ruta de cada imagen, así que basta con apuntar a las dos carpetas
+existentes. `path:` es la raíz común de ambos datasets:
+
+```yaml
+path: C:/Users/pedroam/Documents/Data-Augmentation
+train:
+  - Datasets-Clean/VisDrone/train/images   # 6890 originales
+  - Visdrone-Augmented/train/images        # 6643 aumentadas
+val: Datasets-Clean/VisDrone/val/images    # 1723, igual que en base
+```
+
+Verificado con `check_det_dataset('data/visdrone_combined.yaml')` en el
+entorno `yolov12`: resuelve las dos carpetas y suma **13 533 imágenes de
+entrenamiento**, con la misma validación de 1723 imágenes.
 
 ```
 GitHub/
@@ -200,18 +237,27 @@ GitHub/
 │   ├── .env / .env.example
 │   ├── data/
 │   │   ├── visdrone_base.yaml        (path absoluto, ver arriba)
-│   │   └── visdrone_augmented.yaml   (pendiente de ruta real)
+│   │   ├── visdrone_augmented.yaml   (path absoluto, ver arriba)
+│   │   └── visdrone_combined.yaml    (lista: originales + aumentadas)
 │   └── runs/                         ← resultados (gitignored)
 │       └── YOLOv12/                  ← un solo proyecto W&B; modelo/dataset se distinguen por --name
 │           ├── nano_base/
 │           ├── nano_augmented/
+│           ├── nano_combined/
 │           ├── small_base/
-│           └── small_augmented/
-└── datasets/                         ← gitignored; solo necesario para el dataset aumentado
-    └── VisDrone_Augmented/
-        ├── images/{train,val}/*.jpg  ← salida del pipeline de aumento offline
-        └── labels/{train,val}/*.txt
+│           ├── small_augmented/
+│           └── small_combined/
+Data-Augmentation/                    ← datasets (fuera del repo)
+├── Datasets-Clean/VisDrone/{train,val}/{images,labels}
+└── Visdrone-Augmented/{train,val}/{images,labels}
 ```
+
+> **Caché de etiquetas con el dataset combinado**: ultralytics guarda el
+> caché de una lista de carpetas junto a la **primera** de ellas
+> (`Datasets-Clean\VisDrone\train\labels.cache`). Como el hash no coincide
+> con el del dataset base, al alternar entre corridas base y combined el
+> caché se reconstruye cada vez — es inofensivo, solo agrega unos segundos
+> al arranque.
 
 - **Clases**: `nc: 1`, `names: ['person']` (índice `0`) en ambos `.yaml`.
   Verificado en el dataset real: las etiquetas solo usan el índice `0`.
@@ -222,8 +268,13 @@ GitHub/
   *offline*, previo al entrenamiento. Los aumentos *on-the-fly* de YOLO
   (mosaic, mixup, fliplr, hsv, etc. — sección 6) se aplican igual en ambos
   casos, con los mismos valores por defecto de `ultralytics/cfg/default.yaml`
-  en las cuatro corridas — la única variable entre dataset base y aumentado
+  en todas las corridas — la única variable entre dataset base y aumentado
   es el contenido físico de imágenes/etiquetas.
+- **Dataset combinado** (`visdrone_combined.yaml`) entrena con las
+  originales **más** las aumentadas (13 533 imágenes). Mismos
+  hiperparámetros y misma validación; la única variable es que el
+  conjunto de entrenamiento suma ambos datasets en vez de sustituir uno por
+  otro.
 
 ## 6. Hiperparámetros (idénticos en las cuatro corridas)
 
@@ -397,11 +448,11 @@ sección 9.
 - `train_yolo12.py` carga `.env` con `python-dotenv`; si `WANDB_API_KEY`
   falta, el script aborta con un mensaje claro en vez de entrenar sin
   tracking.
-- Las cuatro corridas reportan al **mismo proyecto W&B** (`${WANDB_PROJECT}`,
-  p. ej. `YOLOv12`); modelo (Nano/Small) y dataset (Base/Augmented) se
-  distinguen por el **nombre de la corrida** (`--name nano_base`,
-  `nano_augmented`, `small_base`, `small_augmented`), no por
-  el proyecto.
+- Todas las corridas reportan al **mismo proyecto W&B** (`${WANDB_PROJECT}`,
+  p. ej. `YOLOv12`); modelo (Nano/Small) y dataset (Base/Augmented/Combined)
+  se distinguen por el **nombre de la corrida** (`--name nano_base`,
+  `nano_augmented`, `nano_combined`, `small_base`, `small_augmented`,
+  `small_combined`), no por el proyecto.
 
 > **Por qué el script no usa `wandb.login(key=...)` (error corregido)**: esa
 > función escribe la key en `~/.netrc` y valida que tenga exactamente 40
@@ -429,8 +480,15 @@ sección 9.
 
 ## 9. Ejecutar los entrenamientos (PowerShell)
 
-Con el entorno `yolov12` (sección 3) activado, ejecuta los cuatro
-entrenamientos — Nano y Small, cada uno con Base y Augmented:
+Con el entorno `yolov12` (sección 3) activado, ejecuta los entrenamientos —
+Nano y Small, cada uno con Base y Augmented (experimentos 1 y 2) y con
+Combined (experimento 3, más abajo).
+
+> **Activa siempre `conda activate yolov12` antes de lanzar el script.**
+> Desde el entorno `base` de Anaconda, importar `ultralytics` falla con
+> `ModuleNotFoundError: No module named 'huggingface_hub'` (ver sección 12).
+
+### Experimentos 1 y 2 — Base y Augmented
 
 ```powershell
 # Nano — dataset base
@@ -474,19 +532,61 @@ python train_yolo12.py `
     --workers 8
 ```
 
+### Experimento 3 — Combined (original + aumentado)
+
+Mismos parámetros que los experimentos 1 y 2; solo cambian `--data` y
+`--name`. Motivo del experimento: sección 13.
+
+```powershell
+# Nano — dataset combinado (originales + aumentadas)
+python train_yolo12.py `
+    --data data\visdrone_combined.yaml `
+    --name nano_combined `
+    --model yolo12n.pt `
+    --epochs 250 `
+    --imgsz 640 `
+    --batch 16 `
+    --workers 8
+
+# Small — dataset combinado (originales + aumentadas)
+python train_yolo12.py `
+    --data data\visdrone_combined.yaml `
+    --name small_combined `
+    --model yolo12s.pt `
+    --epochs 250 `
+    --imgsz 640 `
+    --batch 16 `
+    --workers 8
+```
+
+> **Duración**: con 13 533 imágenes, cada época tiene casi el doble de
+> iteraciones que en base (6890). Con 250 épocas, estima ~11–12 h para Nano
+> y ~19 h para Small (base: 5.9 h y 9.6 h). Se mantienen las 250 épocas para
+> no cambiar ningún parámetro entre experimentos; la diferencia en número
+> total de iteraciones debe mencionarse al comparar resultados. Si se quiere
+> igualar el número de iteraciones al de base, la alternativa es
+> `--epochs 125` (en ese caso, usa otro `--name`, p. ej. `nano_combined_e125`).
+>
+> **`optimizer: auto` sigue resolviendo a SGD**: con 13 533 imágenes,
+> `iterations = ceil(13533/64) × 250 = 53.000`, muy por encima del umbral de
+> `10.000` (sección 7), así que el optimizador efectivo es el mismo que en
+> los experimentos 1 y 2. Con `--epochs 125` serían 26.500, que también
+> queda por encima.
+
 > **`--name` único por combinación**: el script usa `exist_ok=True` en
 > `model.train()`, así que dos corridas con el mismo `--name` se sobrescriben
 > entre sí en `runs/YOLOv12/<name>/` — de ahí `nano`/`small` como prefijo
-> combinado con `_base`/`_augmented` como sufijo, en vez de reutilizar el
-> mismo nombre para las cuatro corridas. En W&B no hay riesgo de sobrescritura (cada
-> corrida crea un run nuevo aunque el nombre se repita); se mantienen
-> nombres únicos igual, para que el dashboard quede ordenado.
+> combinado con `_base`/`_augmented`/`_combined` como sufijo, en vez de
+> reutilizar el mismo nombre para todas las corridas. En W&B no hay riesgo de
+> sobrescritura (cada corrida crea un run nuevo aunque el nombre se repita);
+> se mantienen nombres únicos igual, para que el dashboard quede ordenado.
 
 Los resultados locales quedan en subcarpetas independientes dentro del mismo
 proyecto: `runs/YOLOv12/nano_base/`, `runs/YOLOv12/nano_augmented/`,
-`runs/YOLOv12/small_base/` y `runs/YOLOv12/small_augmented/`. En
-W&B, las cuatro corridas caen en el mismo proyecto (`YOLOv12`), distinguidas
-por nombre de corrida.
+`runs/YOLOv12/nano_combined/`, `runs/YOLOv12/small_base/`,
+`runs/YOLOv12/small_augmented/` y `runs/YOLOv12/small_combined/`. En W&B,
+todas las corridas caen en el mismo proyecto (`YOLOv12`), distinguidas por
+nombre de corrida.
 
 > **Resolución de imagen (bajada al estándar YOLO, 640)**: las imágenes
 > fuente son 1280×720; `imgsz=640` es el default de
@@ -628,3 +728,72 @@ sección indicada.
 | GPU casi al 100% de uso pero el entrenamiento no avanza (época 1 pegada) | `WARNING: CUDA OutOfMemoryError in TaskAlignedAssigner, using CPU` — `batch`/`imgsz` demasiado altos para la VRAM disponible con este dataset (VisDrone tiene muchísimas cajas por imagen) | Bajar `--batch` y/o `--imgsz`, o usar `--batch -1` (autobatch); también se cambió el modelo de `yolo12l.pt` a `yolo12m.pt` | sección 9 (nota de imgsz/batch), historial de commits |
 | Entrenamiento lento pero **sin** ese warning de OOM | Normal a mayor resolución con YOLOv12: los bloques de atención (`A2C2f`) escalan peor que una CNN, y sin FlashAttention (`"Using scaled_dot_product_attention instead"`, esperado en Windows) el fallback es más lento — más notorio en una GPU Blackwell reciente con kernels aún inmaduros | Revisar el `s/it`/`ETA` de la barra de progreso antes de asumir un cuelgue; bajar `imgsz` o subir `--workers` si el cuello de botella es el preprocesamiento en CPU | sección 9 |
 | `torch.cuda.is_available()` da `True` pero el entrenamiento falla o cae a CPU sin avisar | El wheel de PyTorch instalado (`cu124`) no incluye kernels para Blackwell (`sm_120`, RTX 50-series) | Reinstalar con `--index-url https://download.pytorch.org/whl/cu128` | sección 1, sección 4 |
+| `ModuleNotFoundError: No module named 'huggingface_hub'` al importar `ultralytics` | Se está usando el Python del entorno `base` de Anaconda (u otro), no el entorno `yolov12` donde están instaladas las dependencias | `conda activate yolov12` antes de correr el script (o llamar directamente a `...\anaconda3\envs\yolov12\python.exe`) | sección 3, sección 9 |
+| Las corridas `*_augmented` rinden **peor** que `*_base` | El dataset aumentado **sustituye** las imágenes originales en vez de añadirse a ellas (0 originales en `Visdrone-Augmented\train`) | Entrenar con `data\visdrone_combined.yaml` (originales + aumentadas) — experimento 3 | sección 5, sección 13 |
+
+## 13. Resultados (experimentos 1 y 2) y motivo del experimento 3
+
+Métricas de validación (clase `person`, 1723 imágenes, idénticas en todas
+las corridas) en la **mejor época** según el *fitness* de ultralytics
+(`0.1 × mAP50 + 0.9 × mAP50-95`), leídas de `runs/YOLOv12/<name>/results.csv`.
+Las cuatro corridas completaron las 250 épocas (ninguna se detuvo por
+`patience`); la mejor época cae entre la 236 y la 249 en todas.
+
+| Corrida | Precisión | Recall | F1 | mAP50 | mAP50-95 | Tiempo |
+|---|---|---|---|---|---|---|
+| `nano_base` | 0.646 | 0.425 | 0.513 | 0.466 | 0.197 | 5.9 h |
+| `nano_augmented` | 0.623 | 0.410 | 0.494 | 0.440 | 0.182 | 5.7 h |
+| **`small_base`** | **0.699** | **0.475** | **0.566** | **0.529** | **0.235** | 9.6 h |
+| `small_augmented` | 0.678 | 0.462 | 0.549 | 0.507 | 0.223 | 9.3 h |
+
+Evolución de `mAP50-95` por época:
+
+| Corrida | e10 | e25 | e50 | e100 | e150 | e200 | e250 |
+|---|---|---|---|---|---|---|---|
+| `nano_base` | 0.104 | 0.134 | 0.157 | 0.181 | 0.191 | 0.195 | 0.197 |
+| `nano_augmented` | 0.100 | 0.131 | 0.151 | 0.171 | 0.179 | 0.181 | 0.181 |
+| `small_base` | 0.123 | 0.168 | 0.193 | 0.220 | 0.230 | 0.234 | 0.235 |
+| `small_augmented` | 0.134 | 0.167 | 0.190 | 0.212 | 0.218 | 0.221 | 0.223 |
+
+**Conclusiones:**
+
+- **El aumento offline no mejoró la detección de personas**: en ambos
+  tamaños, el aumentado queda por debajo del base en todas las métricas.
+  Caída relativa en `mAP50-95`: −7.8 % en Nano y −5.1 % en Small; en `mAP50`:
+  −5.7 % y −4.0 %.
+- **La diferencia es sistemática**: el aumentado va por debajo desde la
+  época 25 hasta la 250. La única excepción es `small_augmented` en la época
+  10, y esa ventaja desaparece enseguida. Las curvas ya están casi planas al
+  final, así que más épocas no cambiarían la conclusión.
+- **El aumentado generaliza peor**: tiene menor pérdida de entrenamiento
+  (`train/box_loss` final 1.56 vs 1.85 en Nano; 1.35 vs 1.63 en Small) pero
+  mayor pérdida de validación (`val/box_loss` 2.26 vs 2.21; 2.10 vs 2.04).
+  Aprende mejor sus propias imágenes pero rinde peor con imágenes reales, lo
+  que indica que las imágenes aumentadas son más fáciles o se parecen poco a
+  la validación.
+- **El tamaño del modelo pesa más que el dataset**: pasar de Nano a Small
+  suma ~4 puntos de `mAP50-95`; el aumento resta 1.2–1.5 puntos.
+- **Mejor modelo hasta ahora: `small_base`.**
+
+**Motivo del experimento 3 (Combined)**: al revisar el dataset aumentado
+(sección 5) se encontró que **no contiene ninguna imagen original** — cada
+imagen es una versión `_aug_` de una original, y faltan 247 originales. Las
+corridas `*_augmented` no midieron "originales + aumento", sino "aumento en
+lugar de originales". El experimento 3 (`data/visdrone_combined.yaml`,
+comandos en la sección 9) mide el uso habitual del aumento offline: sumar
+las versiones aumentadas a las originales.
+
+**Si Combined tampoco mejora sobre Base**, el problema está en las
+transformaciones mismas, no en cómo se armó el dataset. En ese caso conviene
+revisar visualmente una muestra de las imágenes `_aug_` (escala de las
+personas pegadas desde `Pool-Person`, bordes visibles, alineación de las
+cajas) y comprobar que el aumento offline no se esté sumando de forma
+excesiva al `mosaic`/`hsv`/`scale` que YOLO ya aplica durante el
+entrenamiento (sección 6.3).
+
+> **Limitaciones**: una sola corrida por configuración (`seed=0`), así que no
+> hay intervalo de confianza; que la caída se repita en ambos tamaños y en
+> todas las épocas la hace bastante creíble, pero para afirmarlo con rigor
+> conviene repetir con 2–3 seeds. Las métricas son las que registra el
+> entrenamiento; para el informe final, valida los `best.pt` con
+> `model.val()` sobre el mismo split, o mejor sobre un split de test aparte.
